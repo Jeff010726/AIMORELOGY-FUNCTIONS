@@ -1,343 +1,221 @@
-// Cloudflare Workers 脚本 - 处理微信授权
-// 部署到 Cloudflare Workers 后，将此脚本的 URL 用作后端 API
+// Cloudflare Workers 脚本 - 处理微信授权 (v2 - 修复版)
+// 修复了 access_token 混用导致的 "api unauthorized" 问题
+// 增加了普通 access_token 的缓存机制
 
-// 微信配置 - 在 Cloudflare Workers 环境变量中设置
-const WECHAT_APPID = 'wx2e1f9ccab9e27176';
-const WECHAT_SECRET = '2b0086643a47fe0de574efbfc27c0718';
-const ADMIN_USERNAME = 'admin';
-const ADMIN_PASSWORD = 'Blackrail200107.';
+// --- 配置 ---
+// 在 Cloudflare Worker 的环境变量中配置以下三项
+// APPID: 你的微信公众号AppID
+// APPSECRET: 你的微信公众号AppSecret
+// ALLOWED_ORIGINS: 允许的前端来源，例如 'https://jeff010726.github.io'
 
-// CORS 头部
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+// 微信API地址
+const WECHAT_API = {
+    // [网页授权] 通过code换取access_token
+    oauth2AccessToken: 'https://api.weixin.qq.com/sns/oauth2/access_token',
+    // [网页授权] 拉取用户信息(需scope为 snsapi_userinfo)
+    userInfo: 'https://api.weixin.qq.com/sns/userinfo',
+    // [普通接口] 获取普通access_token
+    accessToken: 'https://api.weixin.qq.com/cgi-bin/token',
+    // [普通接口] 获取用户基本信息（含关注状态）
+    subscriberInfo: 'https://api.weixin.qq.com/cgi-bin/user/info',
 };
 
-// 处理 OPTIONS 请求
-function handleOptions() {
-  return new Response(null, {
-    status: 200,
-    headers: corsHeaders,
-  });
-}
-
-// 生成随机 state
-function generateState() {
-  return Math.random().toString(36).substring(2, 15) + 
-         Math.random().toString(36).substring(2, 15) + 
-         Date.now().toString(36);
-}
-
-// 获取微信 access_token
-async function getWechatAccessToken(code) {
-  const url = `https://api.weixin.qq.com/sns/oauth2/access_token?appid=${WECHAT_APPID}&secret=${WECHAT_SECRET}&code=${code}&grant_type=authorization_code`;
-  
-  try {
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    if (data.errcode) {
-      throw new Error(`微信API错误: ${data.errmsg}`);
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('获取access_token失败:', error);
-    throw error;
-  }
-}
-
-// 获取用户信息
-async function getWechatUserInfo(accessToken, openid) {
-  const url = `https://api.weixin.qq.com/sns/userinfo?access_token=${accessToken}&openid=${openid}&lang=zh_CN`;
-  
-  try {
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    if (data.errcode) {
-      throw new Error(`获取用户信息失败: ${data.errmsg}`);
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('获取用户信息失败:', error);
-    throw error;
-  }
-}
-
-// 获取服务号 access_token
-async function getServiceAccessToken() {
-  const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${WECHAT_APPID}&secret=${WECHAT_SECRET}`;
-  
-  try {
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    if (data.errcode) {
-      throw new Error(`获取服务号token失败: ${data.errmsg}`);
-    }
-    
-    return data.access_token;
-  } catch (error) {
-    console.error('获取服务号token失败:', error);
-    throw error;
-  }
-}
-
-// 检查用户关注状态
-async function checkUserSubscription(openid, serviceToken) {
-  const url = `https://api.weixin.qq.com/cgi-bin/user/info?access_token=${serviceToken}&openid=${openid}&lang=zh_CN`;
-  
-  try {
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    // 如果是48001错误，说明用户未关注
-    if (data.errcode === 48001) {
-      return { subscribe: 0, message: '用户未关注公众号' };
-    }
-    
-    if (data.errcode) {
-      throw new Error(`检查关注状态失败: ${data.errmsg}`);
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('检查关注状态失败:', error);
-    throw error;
-  }
-}
-
-// 处理微信授权回调
-async function handleWechatAuth(request) {
-  try {
-    const { code, state } = await request.json();
-    
-    if (!code || !state) {
-      return new Response(JSON.stringify({
-        success: false,
-        message: '缺少必要参数'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // 获取 access_token
-    const tokenData = await getWechatAccessToken(code);
-    
-    // 获取用户基本信息
-    const userInfo = await getWechatUserInfo(tokenData.access_token, tokenData.openid);
-    
-    // 获取服务号 access_token
-    const serviceToken = await getServiceAccessToken();
-    
-    // 检查用户关注状态
-    const subscriptionInfo = await checkUserSubscription(tokenData.openid, serviceToken);
-    
-    // 判断是否已关注
-    if (subscriptionInfo.subscribe !== 1) {
-      return new Response(JSON.stringify({
-        success: false,
-        message: '请先关注我们的微信服务号后再登录',
-        needSubscribe: true,
-        qrCodeUrl: 'qrcode_for_gh_ede2796af721_258.jpg'
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // 确定用户等级
-    let userLevel = '普通用户';
-    if (subscriptionInfo.subscribe_time) {
-      const subscribeDate = new Date(subscriptionInfo.subscribe_time * 1000);
-      const now = new Date();
-      const daysSinceSubscribe = (now - subscribeDate) / (1000 * 60 * 60 * 24);
-      
-      if (daysSinceSubscribe > 365) {
-        userLevel = 'SVIP';
-      } else if (daysSinceSubscribe > 30) {
-        userLevel = 'VIP';
-      }
-    }
-
-    // 根据等级设置使用次数限制
-    const maxUsage = {
-      '普通用户': 10,
-      'VIP': 50,
-      'SVIP': 200,
-      'Admin': 999999
-    }[userLevel] || 10;
-
-    // 登录成功，返回用户信息
-    const finalUserInfo = {
-      openid: tokenData.openid,
-      nickname: userInfo.nickname,
-      headimgurl: userInfo.headimgurl,
-      sex: userInfo.sex,
-      city: userInfo.city,
-      province: userInfo.province,
-      country: userInfo.country,
-      subscribe: subscriptionInfo.subscribe,
-      subscribe_time: subscriptionInfo.subscribe_time,
-      unionid: userInfo.unionid,
-      level: userLevel,
-      maxUsage: maxUsage,
-      usageCount: 0, // 这里应该从数据库获取实际使用次数
-      loginTime: Date.now()
-    };
-
-    return new Response(JSON.stringify({
-      success: true,
-      userInfo: finalUserInfo
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-
-  } catch (error) {
-    console.error('微信授权处理失败:', error);
-    return new Response(JSON.stringify({
-      success: false,
-      message: error.message || '登录失败，请重试'
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
-}
-
-// 处理管理员登录
-async function handleAdminLogin(request) {
-  try {
-    const { username, password } = await request.json();
-    
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-      return new Response(JSON.stringify({
-        success: true,
-        userInfo: {
-          openid: 'admin_' + Date.now(),
-          nickname: '管理员',
-          headimgurl: '',
-          level: 'Admin',
-          maxUsage: 999999,
-          usageCount: 0,
-          loginTime: Date.now()
-        }
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    } else {
-      return new Response(JSON.stringify({
-        success: false,
-        message: '用户名或密码错误'
-      }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-  } catch (error) {
-    return new Response(JSON.stringify({
-      success: false,
-      message: '登录失败'
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
-}
-
-// 生成微信授权URL
-async function generateAuthUrl(request) {
-  try {
-    const url = new URL(request.url);
-    const redirectUri = url.searchParams.get('redirect_uri');
-    const scope = url.searchParams.get('scope') || 'snsapi_userinfo';
-    
-    if (!redirectUri) {
-      return new Response(JSON.stringify({
-        success: false,
-        message: '缺少回调地址'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    const state = generateState();
-    const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${WECHAT_APPID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}#wechat_redirect`;
-
-    return new Response(JSON.stringify({
-      success: true,
-      authUrl: authUrl,
-      state: state
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-
-  } catch (error) {
-    return new Response(JSON.stringify({
-      success: false,
-      message: '生成授权链接失败'
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
-}
-
-// 主处理函数
+// --- 主处理逻辑 ---
 export default {
-  async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-    const path = url.pathname;
+    async fetch(request, env, ctx) {
+        // 跨域预检请求
+        if (request.method === 'OPTIONS') {
+            return handleOptions(request, env);
+        }
 
-    // 处理 OPTIONS 请求
-    if (request.method === 'OPTIONS') {
-      return handleOptions();
+        const url = new URL(request.url);
+        // 只处理 /wechat/auth 路径
+        if (url.pathname !== '/wechat/auth') {
+            return new Response(JSON.stringify({ success: false, message: 'Invalid path' }), { status: 404, headers: corsHeaders(env) });
+        }
+
+        if (request.method !== 'POST') {
+            return new Response(JSON.stringify({ success: false, message: 'Method not allowed' }), { status: 405, headers: corsHeaders(env) });
+        }
+
+        try {
+            const { code } = await request.json();
+            if (!code) {
+                return new Response(JSON.stringify({ success: false, message: 'Missing `code` parameter' }), { status: 400, headers: corsHeaders(env) });
+            }
+
+            // --- 核心授权流程 ---
+
+            // 1. 用 code 换取网页授权 access_token 和 openid
+            const oauth2TokenData = await getOauth2AccessToken(code, env);
+            if (!oauth2TokenData.success) {
+                return new Response(JSON.stringify(oauth2TokenData), { status: 500, headers: corsHeaders(env) });
+            }
+            const { access_token: oauth2_token, openid, scope } = oauth2TokenData.data;
+
+            // 2. 获取用户信息
+            // 如果 scope 是 snsapi_userinfo，则可以获取详细信息；否则只能获取 openid
+            let userInfo = { openid, scope };
+            if (scope === 'snsapi_userinfo') {
+                const userInfoResult = await getUserInfo(oauth2_token, openid, env);
+                if (!userInfoResult.success) {
+                    return new Response(JSON.stringify(userInfoResult), { status: 500, headers: corsHeaders(env) });
+                }
+                userInfo = { ...userInfo, ...userInfoResult.data };
+            }
+
+            // 3. 检查用户是否关注 (需要用普通 access_token)
+            const subscriptionResult = await checkSubscription(openid, env);
+            if (!subscriptionResult.success) {
+                return new Response(JSON.stringify(subscriptionResult), { status: 500, headers: corsHeaders(env) });
+            }
+            const { subscribe, subscribe_time } = subscriptionResult.data;
+            
+            // 合并最终用户信息
+            const finalUserInfo = { ...userInfo, subscribe, subscribe_time };
+
+            // 4. 判断是否需要强制关注
+            if (subscribe !== 1) {
+                return new Response(JSON.stringify({
+                    success: false,
+                    needSubscribe: true,
+                    message: '请先关注我们的微信服务号后再登录',
+                    qrCodeUrl: 'qrcode_for_gh_ede2796af721_258.jpg' // 你的公众号二维码图片
+                }), { status: 200, headers: corsHeaders(env) });
+            }
+
+            // 5. 登录成功
+            return new Response(JSON.stringify({
+                success: true,
+                userInfo: finalUserInfo
+            }), { status: 200, headers: corsHeaders(env) });
+
+        } catch (error) {
+            console.error('Auth process error:', error);
+            return new Response(JSON.stringify({ success: false, message: `Server error: ${error.message}` }), { status: 500, headers: corsHeaders(env) });
+        }
+    },
+};
+
+// --- 辅助函数 ---
+
+/**
+ * [网页授权] 1. 用 code 换取网页授权 access_token
+ */
+async function getOauth2AccessToken(code, env) {
+    const url = `${WECHAT_API.oauth2AccessToken}?appid=${env.APPID}&secret=${env.APPSECRET}&code=${code}&grant_type=authorization_code`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.errcode) {
+        return { success: false, message: `获取网页授权token失败: ${data.errmsg}`, details: data };
+    }
+    return { success: true, data };
+}
+
+/**
+ * [网页授权] 2. 用网页授权 access_token 拉取用户信息
+ */
+async function getUserInfo(oauth2AccessToken, openid, env) {
+    const url = `${WECHAT_API.userInfo}?access_token=${oauth2AccessToken}&openid=${openid}&lang=zh_CN`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.errcode) {
+        return { success: false, message: `获取用户信息失败: ${data.errmsg}`, details: data };
+    }
+    // 移除敏感或不必要的字段
+    const { privilege, ...rest } = data;
+    return { success: true, data: rest };
+}
+
+/**
+ * [普通接口] 3. 检查用户是否关注
+ */
+async function checkSubscription(openid, env) {
+    // 3.1 获取普通 access_token (带缓存)
+    const globalTokenResult = await getGlobalAccessToken(env);
+    if (!globalTokenResult.success) {
+        return globalTokenResult;
+    }
+    const global_token = globalTokenResult.data.access_token;
+
+    // 3.2 用普通 token 查询用户信息
+    const url = `${WECHAT_API.subscriberInfo}?access_token=${global_token}&openid=${openid}&lang=zh_CN`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.errcode) {
+        return { success: false, message: `检查关注状态失败: ${data.errmsg}`, details: data };
+    }
+    return { success: true, data };
+}
+
+/**
+ * [普通接口] 获取并缓存普通 access_token
+ */
+async function getGlobalAccessToken(env) {
+    const cache = caches.default;
+    const cacheKey = `https://wechat.com/global_access_token`;
+    let response = await cache.match(cacheKey);
+
+    if (response) {
+        const cachedData = await response.json();
+        // 检查缓存是否在有效期内 (微信默认7200秒，我们提前5分钟刷新)
+        if (cachedData.expires_at > Date.now()) {
+            return { success: true, data: cachedData };
+        }
     }
 
-    // 路由处理
-    switch (path) {
-      case '/wechat/auth':
-        if (request.method === 'POST') {
-          return handleWechatAuth(request);
-        }
-        break;
-        
-      case '/admin/login':
-        if (request.method === 'POST') {
-          return handleAdminLogin(request);
-        }
-        break;
-        
-      case '/wechat/auth-url':
-        if (request.method === 'GET') {
-          return generateAuthUrl(request);
-        }
-        break;
-        
-      default:
-        return new Response(JSON.stringify({
-          success: false,
-          message: '接口不存在'
-        }), {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    // 缓存不存在或已过期，重新获取
+    const url = `${WECHAT_API.accessToken}?grant_type=client_credential&appid=${env.APPID}&secret=${env.APPSECRET}`;
+    const tokenResponse = await fetch(url);
+    const tokenData = await tokenResponse.json();
+
+    if (tokenData.errcode) {
+        return { success: false, message: `获取普通token失败: ${tokenData.errmsg}`, details: tokenData };
+    }
+
+    // 缓存新的 token
+    const expiresIn = tokenData.expires_in || 7200;
+    const cacheData = {
+        access_token: tokenData.access_token,
+        // 提前5分钟过期，防止临界问题
+        expires_at: Date.now() + (expiresIn - 300) * 1000,
+    };
+    
+    const cacheResponse = new Response(JSON.stringify(cacheData), {
+        headers: { 'Content-Type': 'application/json' },
+    });
+    // 缓存时间与token有效期一致
+    await cache.put(cacheKey, cacheResponse.clone());
+
+    return { success: true, data: cacheData };
+}
+
+
+// --- CORS 处理 ---
+function corsHeaders(env) {
+    return {
+        'Access-Control-Allow-Origin': env.ALLOWED_ORIGINS || '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+    };
+}
+
+function handleOptions(request, env) {
+    if (
+        request.headers.get('Origin') !== null &&
+        request.headers.get('Access-Control-Request-Method') !== null &&
+        request.headers.get('Access-Control-Request-Headers') !== null
+    ) {
+        // Handle CORS preflight requests.
+        return new Response(null, {
+            headers: corsHeaders(env),
+        });
+    } else {
+        // Handle standard OPTIONS request.
+        return new Response(null, {
+            headers: {
+                Allow: 'POST, OPTIONS',
+            },
         });
     }
-
-    return new Response(JSON.stringify({
-      success: false,
-      message: '方法不允许'
-    }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  },
-};
+}
