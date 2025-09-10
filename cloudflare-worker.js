@@ -1,5 +1,6 @@
-// Cloudflare Workers 脚本 - 微信扫码登录 (v2 - 完整版)
+// Cloudflare Workers 脚本 - 微信扫码登录 (v3 - 增强容错最终版)
 // 功能: 生成二维码 -> 接收扫码/关注事件 -> 前端轮询状态 -> 登录成功
+// 新增: 增强的错误处理和状态反馈机制，防止Worker崩溃并在前端显示具体错误。
 // 依赖: Cloudflare KV, 环境变量 (APPID, APPSECRET, ALLOWED_ORIGINS, WECHAT_TOKEN)
 
 // --- 微信API地址 ---
@@ -77,6 +78,7 @@ async function handleWechatValidation(request, env) {
 
 async function handleWechatEvent(request, env, ctx) {
     const xmlText = await request.text();
+    // 在后台处理事件，并立即响应微信，防止超时
     ctx.waitUntil(processEvent(xmlText, env));
     return new Response('success');
 }
@@ -117,45 +119,62 @@ async function handleQrLoginStatus(request, env) {
     if (!statusJson) return new Response(JSON.stringify({ success: true, status: 'EXPIRED' }), { status: 200 });
 
     const statusData = JSON.parse(statusJson);
+    // 如果成功，删除该条记录，防止重复使用
     if (statusData.status === 'SUCCESS') {
         await env.WECHAT_LOGIN_KV.delete(sceneId);
-        return new Response(JSON.stringify({ success: true, status: 'SUCCESS', userInfo: statusData.userInfo }), { status: 200 });
     }
 
-    return new Response(JSON.stringify({ success: true, status: statusData.status }), { status: 200 });
+    return new Response(JSON.stringify({ success: true, ...statusData }), { status: 200 });
 }
 
 // --- 后台任务与辅助函数 ---
 
 async function processEvent(xmlText, env) {
-    const eventData = parseXml(xmlText);
-    if (eventData.MsgType !== 'event' || (eventData.Event !== 'subscribe' && eventData.Event !== 'SCAN')) return;
+    let sceneId = '';
+    try {
+        const eventData = parseXml(xmlText);
+        if (eventData.MsgType !== 'event' || (eventData.Event !== 'subscribe' && eventData.Event !== 'SCAN')) return;
 
-    let sceneId = eventData.EventKey;
-    if (eventData.Event === 'subscribe') sceneId = sceneId.substring(8); // "qrscene_".length
+        sceneId = eventData.EventKey;
+        if (eventData.Event === 'subscribe') sceneId = sceneId.substring(8); // "qrscene_".length
 
-    const openId = eventData.FromUserName;
-    if (!sceneId || !openId) return;
+        const openId = eventData.FromUserName;
+        if (!sceneId || !openId) return;
 
-    const statusJson = await env.WECHAT_LOGIN_KV.get(sceneId);
-    if (!statusJson) return;
+        const statusJson = await env.WECHAT_LOGIN_KV.get(sceneId);
+        if (!statusJson) return; // 二维码已过期
 
-    const statusData = JSON.parse(statusJson);
-    if (statusData.status !== 'PENDING') return;
-    
-    statusData.status = 'SCANNED';
-    statusData.openId = openId;
-    await env.WECHAT_LOGIN_KV.put(sceneId, JSON.stringify(statusData));
+        const statusData = JSON.parse(statusJson);
+        if (statusData.status !== 'PENDING') return; // 已被处理
+        
+        statusData.status = 'SCANNED';
+        statusData.openId = openId;
+        await env.WECHAT_LOGIN_KV.put(sceneId, JSON.stringify(statusData));
 
-    const globalTokenResult = await getGlobalAccessToken(env);
-    if (!globalTokenResult.success) return;
+        const globalTokenResult = await getGlobalAccessToken(env);
+        if (!globalTokenResult.success) {
+            throw new Error(`获取全局Token失败: ${globalTokenResult.message}`);
+        }
 
-    const userInfoResult = await getUserInfo(openId, globalTokenResult.data.access_token);
-    if (!userInfoResult.success) return;
+        const userInfoResult = await getUserInfo(openId, globalTokenResult.data.access_token);
+        if (!userInfoResult.success) {
+            throw new Error(`获取用户信息失败: ${userInfoResult.details.errmsg}`);
+        }
 
-    statusData.status = 'SUCCESS';
-    statusData.userInfo = userInfoResult.data;
-    await env.WECHAT_LOGIN_KV.put(sceneId, JSON.stringify(statusData));
+        statusData.status = 'SUCCESS';
+        statusData.userInfo = userInfoResult.data;
+        await env.WECHAT_LOGIN_KV.put(sceneId, JSON.stringify(statusData));
+
+    } catch (error) {
+        console.error('处理微信事件失败:', error);
+        // 如果出错，并且我们能拿到sceneId，就更新KV状态为ERROR
+        if (sceneId) {
+            await env.WECHAT_LOGIN_KV.put(sceneId, JSON.stringify({
+                status: 'ERROR',
+                message: error.message || '未知后台错误'
+            }));
+        }
+    }
 }
 
 async function getUserInfo(openid, accessToken) {

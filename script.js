@@ -103,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 const response = await fetch(`${WORKER_URL}/wechat/qr-login/status?sceneId=${sceneId}`);
-                if (!response.ok) return; // Silently ignore failed polls
+                if (!response.ok) return;
 
                 const data = await response.json();
                 if (!data.success) return;
@@ -128,11 +128,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         }, 1500);
                         break;
                     case 'SCANNED':
-                        loginStatusEl.innerHTML = '<div class="status-waiting"><i class="fas fa-check-circle" style="color: #00ff88;"></i><p>扫码成功，等待关注...</p></div>';
+                        loginStatusEl.innerHTML = '<div class="status-waiting"><i class="fas fa-check-circle" style="color: #00ff88;"></i><p>扫码成功，等待服务器处理...</p></div>';
                         break;
                     case 'EXPIRED':
                         clearInterval(pollingInterval);
                         loginStatusEl.innerHTML = '<p style="color: red;">二维码已过期，请关闭后重试。</p>';
+                        break;
+                    case 'ERROR':
+                        clearInterval(pollingInterval);
+                        loginStatusEl.innerHTML = `<p style="color: red;">登录失败: ${data.message || '未知后台错误'}</p>`;
                         break;
                     case 'PENDING':
                     default:
