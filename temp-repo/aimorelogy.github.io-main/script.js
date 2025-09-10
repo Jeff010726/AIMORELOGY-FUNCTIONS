@@ -850,6 +850,12 @@ class WechatLoginIntegration {
         this.navMenu = $(navMenuSelector);
         this.ctaButton = $(ctaSelector);
         this.userInfo = null;
+
+        // Instantiate the WechatAuth module
+        const WECHAT_APPID = 'wx2e1f9ccab9e27176';
+        const WORKER_URL = 'https://ecommerce-api.jeff010726bd.workers.dev';
+        this.wechatAuth = new WechatAuth(WECHAT_APPID, WORKER_URL);
+
         this.init();
     }
 
@@ -927,7 +933,7 @@ class WechatLoginIntegration {
     async startLogin() {
         try {
             const redirectUri = `${window.location.origin}/AIMORELOGY-FUNCTIONS/wechat-callback.html`;
-            const authUrl = await wechatAuth.generateAuthUrl(redirectUri, 'snsapi_userinfo');
+            const authUrl = await this.wechatAuth.generateAuthUrl(redirectUri, 'snsapi_userinfo');
             window.location.href = authUrl;
         } catch (error) {
             console.error('微信登录启动失败:', error);

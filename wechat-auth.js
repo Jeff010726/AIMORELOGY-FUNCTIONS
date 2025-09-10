@@ -92,6 +92,7 @@ class WechatAuth {
     }
 }
 
-// 导出微信授权实例 - 使用Cloudflare Workers URL
-const WORKER_URL = 'https://ecommerce-api.jeff010726bd.workers.dev';
-const wechatAuth = new WechatAuth(WECHAT_APPID, WORKER_URL);
+// The WechatAuth class is now globally available.
+// Instantiation should be done in the script that uses it.
+// Example:
+// const wechatAuth = new WechatAuth('YOUR_APP_ID', 'YOUR_WORKER_URL');

@@ -69,6 +69,11 @@
     </script>
     <script src="wechat-auth.js"></script>
     <script>
+        // Instantiate the WechatAuth module
+        const WECHAT_APPID = 'wx2e1f9ccab9e27176';
+        const WORKER_URL = 'https://ecommerce-api.jeff010726bd.workers.dev';
+        const wechatAuth = new WechatAuth(WECHAT_APPID, WORKER_URL);
+
         // 处理微信授权回调
         async function handleWechatCallback() {
             const urlParams = new URLSearchParams(window.location.search);
