@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="公众号爆文生成器 - 基于DeepSeek AI的智能文章创作工具，专业写作风格，流式生成体验">
+    <meta name="keywords" content="公众号,爆文生成器,AI写作,DeepSeek,文章生成,内容创作,深圳爱谋科技">
+    <title>公众号爆文生成器 - 深圳市爱谋科技有限公司 | AI智能写作工具</title>
+    
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    
+    <!-- Fonts with display swap for better performance -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" 
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+          integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+          crossorigin="anonymous"
+          referrerpolicy="no-referrer" />
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Meta tags for better SEO -->
+    <meta name="robots" content="index, follow">
+    <meta name="author" content="深圳市爱谋科技有限公司">
+    <meta name="copyright" content="© 2025 深圳市爱谋科技有限公司">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h1 class="brand-logo">爱谋科技</h1>
+                <span class="brand-tag">让技术更简单</span>
+            </div>
+            
+            <div class="nav-menu" id="navMenu">
+                <a href="#home" class="nav-link active">爆文生成器</a>
+                <a href="ecommerce-image.html" class="nav-link">电商生图</a>
+                <a href="video-generation.html" class="nav-link">视频生成</a>
+            </div>
+            
+            <div class="nav-user" id="navUser">
+                <!-- 未登录状态 -->
+                <div class="user-login" id="loginSection">
+                    <button class="login-btn" id="loginBtn">
+                        <svg class="wechat-icon" viewBox="0 0 24 24" width="18" height="18">
+                            <path fill="currentColor" d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.162 4.203 2.969 5.522L2.25 17.25l2.844-1.406c.75.188 1.547.281 2.397.281.281 0 .562-.016.844-.047C8.594 18.891 11.297 20.812 14.5 20.812c.75 0 1.5-.094 2.203-.281L19.547 22l-.703-2.219C20.234 18.5 21 17.125 21 15.562c0-3.094-2.734-5.625-6.094-5.625-.406 0-.813.031-1.203.094C12.875 4.25 11.062 2.188 8.691 2.188zm0 1.5c2.047 0 3.844 1.203 4.594 2.906.031.063.047.125.078.188C12.594 6.688 12 6.625 11.406 6.625c-3.953 0-7.156 2.797-7.156 6.25 0 .422.063.844.156 1.25C2.219 13.281 1.5 11.5 1.5 9.53c0-3.219 3.094-5.844 7.191-5.844zm5.809 8.937c2.953 0 5.344 2.016 5.344 4.5 0 1.031-.422 2-.969 2.781l.5 1.5-1.5-.75c-.5.125-1.016.188-1.531.188-2.953 0-5.344-2.016-5.344-4.5s2.391-4.719 5.5-4.719z"/>
+                        </svg>
+                        微信登录
+                    </button>
+                    <button class="admin-btn hidden" id="adminBtn">
+                        <i class="fas fa-user-shield"></i>
+                        管理员
+                    </button>
+                </div>
+                
+                <!-- 已登录状态 -->
+                <div class="user-info hidden" id="userSection">
+                    <div class="user-avatar">
+                        <img id="userAvatar" src="" alt="用户头像">
+                    </div>
+                    <div class="user-details">
+                        <div class="user-name" id="userName">用户名</div>
+                        <div class="user-level" id="userLevel">普通用户</div>
+                        <div class="user-usage" id="userUsage">剩余: 10/10</div>
+                    </div>
+                    <button class="logout-btn" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <button type="button" class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- 品牌标识区域 -->
+        <header class="brand-header" id="home">
+            <div class="hero-badge">
+                <i class="fas fa-robot"></i>
+                <span>AI智能写作 · 专业爆文生成</span>
+            </div>
+            <h1 class="main-title">公众号爆文生成器</h1>
+            <p class="company-name">深圳市爱谋科技有限公司</p>
+        </header>
+
+        <!-- 核心输入区域 -->
+        <main class="input-section">
+            <div class="input-group">
+                <label for="topic" class="input-label">文章主题/内容</label>
+                <textarea 
+                    id="topic" 
+                    class="input-field" 
+                    placeholder="请输入您想要创作的文章主题或核心内容..."
+                    rows="4"
+                ></textarea>
+            </div>
+
+            <div class="input-group">
+                <label for="reference" class="input-label">参考文章</label>
+                <textarea 
+                    id="reference" 
+                    class="input-field" 
+                    placeholder="请输入参考文章内容或链接（可选）..."
+                    rows="4"
+                ></textarea>
+            </div>
+
+            <div class="input-group">
+                <label class="input-label">字数限制</label>
+                <div class="word-count-container">
+                    <span class="word-count-text">从</span>
+                    <input 
+                        type="number" 
+                        id="minWords" 
+                        class="word-count-input" 
+                        placeholder="800" 
+                        min="100" 
+                        max="10000"
+                        value="800"
+                    >
+                    <span class="word-count-text">字到</span>
+                    <input 
+                        type="number" 
+                        id="maxWords" 
+                        class="word-count-input" 
+                        placeholder="1500" 
+                        min="100" 
+                        max="10000"
+                        value="1500"
+                    >
+                    <span class="word-count-text">字</span>
+                </div>
+            </div>
+        </main>
+
+        <!-- 生成控制区域 -->
+        <section class="generate-section">
+            <button id="generateBtn" class="generate-btn">
+                <span class="btn-text">生成爆文</span>
+            </button>
+            
+            <!-- 加载动画 -->
+            <div id="loadingAnimation" class="loading-container hidden">
+                <div class="loading-spinner"></div>
+                <p class="loading-text">AI正在创作中...</p>
+            </div>
+        </section>
+
+        <!-- 结果展示区域 -->
+        <section class="result-section">
+            <div class="result-container hidden" id="resultContainer">
+                <div class="result-header">
+                    <h3 class="result-title">生成结果</h3>
+                    <div class="result-actions">
+                        <button id="copyBtn" class="action-btn">复制文章</button>
+                        <button id="regenerateBtn" class="action-btn secondary">重新生成</button>
+                    </div>
+                </div>
+                <div class="result-content" id="resultContent">
+                    <!-- 生成的文章内容将在这里显示 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- 服务优势展示 -->
+        <section class="services-showcase">
+            <div class="showcase-header">
+                <span class="section-badge">核心优势</span>
+                <h2 class="section-title">专业技术团队 · 完整服务链路</h2>
+                <p class="section-desc">依托深圳强大的供应链优势，为您提供从研发到市场的全方位支持</p>
+            </div>
+            
+            <div class="services-grid">
+                <div class="service-card featured">
+                    <div class="service-icon">
+                        <i class="fas fa-brain"></i>
+                        <div class="icon-glow"></div>
+                    </div>
+                    <div class="service-badge">核心优势</div>
+                    <h3 class="service-title">软硬件设计研发</h3>
+                    <p class="service-desc">
+                        从电路设计、PCB Layout到嵌入式开发、应用软件，提供全栈技术服务。专精IoT物联网、AI边缘计算、工业控制等领域。
+                    </p>
+                    <div class="service-highlights">
+                        <span class="highlight">MCU开发</span>
+                        <span class="highlight">IoT物联网</span>
+                        <span class="highlight">AI智能硬件</span>
+                        <span class="highlight">嵌入式系统</span>
+                    </div>
+                </div>
+                
+                <div class="service-card">
+                    <div class="service-icon">
+                        <i class="fas fa-industry"></i>
+                        <div class="icon-glow"></div>
+                    </div>
+                    <h3 class="service-title">量产制造代工</h3>
+                    <p class="service-desc">
+                        深度合作多家优质工厂，支持PCBA贴片、注塑开模、CNC加工、成品组装。严格品控体系，交期准时率达98%。
+                    </p>
+                    <div class="service-highlights">
+                        <span class="highlight">智能工厂</span>
+                        <span class="highlight">质量控制</span>
+                        <span class="highlight">供应链</span>
+                    </div>
+                </div>
+                
+                <div class="service-card">
+                    <div class="service-icon">
+                        <i class="fas fa-palette"></i>
+                        <div class="icon-glow"></div>
+                    </div>
+                    <h3 class="service-title">网站建设服务</h3>
+                    <p class="service-desc">
+                        企业官网、电商平台、管理系统定制开发。采用React/Vue等现代框架，支持小程序、H5、APP多端适配。
+                    </p>
+                    <div class="service-highlights">
+                        <span class="highlight">品牌设计</span>
+                        <span class="highlight">网站开发</span>
+                        <span class="highlight">用户体验</span>
+                    </div>
+                </div>
+                
+
+            </div>
+            
+            <div class="services-cta">
+                <div class="cta-content">
+                    <h3>选择我们的理由</h3>
+                    <p>深圳本地团队，响应快速，沟通无障碍。重合同守信用，已为50+中小企业提供服务</p>
+                    <div class="cta-benefits">
+                        <div class="benefit">
+                            <i class="fas fa-bolt"></i>
+                            <span>30%成本节省</span>
+                        </div>
+                        <div class="benefit">
+                            <i class="fas fa-trophy"></i>
+                            <span>2倍开发效率</span>
+                        </div>
+                        <div class="benefit">
+                            <i class="fas fa-clock"></i>
+                            <span>98%准时交付</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 客户评价 -->
+        <section class="testimonials">
+            <div class="testimonials-header">
+                <span class="section-badge">客户评价</span>
+                <h2 class="section-title">他们的成功就是我们的成功</h2>
+            </div>
+            
+            <div class="testimonials-grid">
+                <div class="testimonial-card">
+                    <div class="testimonial-stars">
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <p class="testimonial-text">
+                        "爱谋科技的专业程度令人满意。从产品设计到最终上市，他们提供了全方位的支持。特别是在供应链管理方面，帮我们节省了30%的成本。"
+                    </p>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="author-info">
+                            <h4>张总</h4>
+                            <p>某智能科技CEO</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="testimonial-card">
+                    <div class="testimonial-stars">
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <p class="testimonial-text">
+                        "网站改版后，我们的线上转化率提升了150%。爱谋团队不仅技术过硬，更懂得如何通过设计和营销策略来提升业务价值。"
+                    </p>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="author-info">
+                            <h4>李经理</h4>
+                            <p>电商平台运营总监</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="testimonial-card">
+                    <div class="testimonial-stars">
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <p class="testimonial-text">
+                        "合作3年来，爱谋科技一直是我们最可靠的技术合作伙伴。他们的响应速度快，解决问题的能力强，真正做到了7×24小时支持。"
+                    </p>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="author-info">
+                            <h4>王总监</h4>
+                            <p>医疗器械公司CTO</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 联系我们 -->
+        <section class="contact">
+            <div class="contact-header">
+                <span class="section-badge">联系我们</span>
+                <h2 class="section-title">开启合作之旅</h2>
+                <p class="section-desc">专业技术团队，为您提供一站式解决方案</p>
+            </div>
+            
+            <div class="contact-grid">
+                <div class="contact-info">
+                    <div class="info-item">
+                        <div class="info-icon">
+                            <i class="fas fa-user-tie"></i>
+                        </div>
+                        <div class="info-content">
+                            <h4>联系人</h4>
+                            <p>谢旭涵</p>
+                            <span class="position">VP</span>
+                        </div>
+                    </div>
+                    
+                    <div class="info-item">
+                        <div class="info-icon">
+                            <i class="fas fa-phone"></i>
+                        </div>
+                        <div class="info-content">
+                            <h4>联系电话</h4>
+                            <p>18933063380</p>
+                            <span class="note">（微信同号）</span>
+                        </div>
+                    </div>
+                    
+                    <div class="info-item">
+                        <div class="info-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div class="info-content">
+                            <h4>公司地址</h4>
+                            <p>深圳市宝安区西乡街道<br>南昌社区富士君荟苑1栋1单元201</p>
+                        </div>
+                    </div>
+                    
+                    <div class="info-item">
+                        <div class="info-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="info-content">
+                            <h4>服务时间</h4>
+                            <p>周一至周五: 9:00-18:00<br>技术支持: 7×24小时</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="contact-cta">
+                    <div class="cta-card">
+                        <h3>立即咨询项目合作</h3>
+                        <p>7年技术积累，50+成功案例，专业团队为您服务</p>
+                        <div class="cta-features">
+                            <div class="feature">
+                                <i class="fas fa-check-circle"></i>
+                                <span>免费技术咨询</span>
+                            </div>
+                            <div class="feature">
+                                <i class="fas fa-check-circle"></i>
+                                <span>24小时快速响应</span>
+                            </div>
+                            <div class="feature">
+                                <i class="fas fa-check-circle"></i>
+                                <span>专业解决方案</span>
+                            </div>
+                        </div>
+                        <a href="tel:18933063380" class="contact-btn">
+                            <i class="fas fa-phone"></i>
+                            立即拨打：18933063380
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- 微信登录弹窗 -->
+    <div class="modal hidden" id="loginModal">
+        <div class="modal-overlay" id="modalOverlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>微信扫码登录</h3>
+                <button class="modal-close" id="modalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="qr-container">
+                    <div class="qr-code" id="qrCode">
+                        <i class="fas fa-qrcode"></i>
+                        <p>正在生成二维码...</p>
+                    </div>
+                    <p class="qr-tip">请使用微信扫描二维码关注服务号登录</p>
+                </div>
+                <div class="login-status" id="loginStatus">
+                    <div class="status-waiting">
+                        <i class="fas fa-mobile-alt"></i>
+                        <p>等待扫码...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 管理员登录弹窗 -->
+    <div class="modal hidden" id="adminModal">
+        <div class="modal-overlay" id="adminOverlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>管理员登录</h3>
+                <button class="modal-close" id="adminClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form class="admin-form" id="adminForm">
+                    <div class="form-group">
+                        <label for="adminUsername">用户名</label>
+                        <input type="text" id="adminUsername" name="username" placeholder="请输入管理员用户名" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="adminPassword">密码</label>
+                        <input type="password" id="adminPassword" name="password" placeholder="请输入管理员密码" required>
+                    </div>
+                    <button type="submit" class="admin-login-btn">
+                        <i class="fas fa-sign-in-alt"></i>
+                        登录
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="wechat-auth.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

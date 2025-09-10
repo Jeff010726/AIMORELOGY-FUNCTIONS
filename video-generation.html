@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频生成 - 爱谋科技</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h1 class="brand-logo">爱谋科技</h1>
+                <span class="brand-tag">让技术更简单</span>
+            </div>
+            
+            <div class="nav-menu" id="navMenu">
+                <a href="index.html" class="nav-link">爆文生成器</a>
+                <a href="ecommerce-image.html" class="nav-link">电商生图</a>
+                <a href="video-generation.html" class="nav-link active">视频生成</a>
+            </div>
+            
+            <div class="nav-user" id="navUser">
+                <!-- 未登录状态 -->
+                <div class="user-login hidden" id="loginSection">
+                    <button class="login-btn" id="loginBtn">
+                        <i class="fas fa-qrcode"></i>
+                        微信登录
+                    </button>
+                    <button class="admin-btn hidden" id="adminBtn">
+                        <i class="fas fa-user-shield"></i>
+                        管理员
+                    </button>
+                </div>
+                
+                <!-- 已登录状态 -->
+                <div class="user-info hidden" id="userSection">
+                    <div class="user-avatar">
+                        <img id="userAvatar" src="" alt="用户头像">
+                    </div>
+                    <div class="user-details">
+                        <div class="user-name" id="userName">用户名</div>
+                        <div class="user-level" id="userLevel">普通用户</div>
+                        <div class="user-usage" id="userUsage">剩余: 10/10</div>
+                    </div>
+                    <button class="logout-btn" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <button type="button" class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- 即将上线页面 -->
+        <section class="coming-soon-section">
+            <div class="coming-soon-content">
+                <div class="coming-soon-icon">
+                    <i class="fas fa-video"></i>
+                </div>
+                <h1 class="coming-soon-title">视频生成功能</h1>
+                <p class="coming-soon-subtitle">AI驱动的智能视频创作工具</p>
+                
+                <div class="feature-preview">
+                    <div class="preview-card">
+                        <i class="fas fa-film"></i>
+                        <h3>文本转视频</h3>
+                        <p>输入文本描述，自动生成精美视频内容</p>
+                    </div>
+                    <div class="preview-card">
+                        <i class="fas fa-microphone"></i>
+                        <h3>智能配音</h3>
+                        <p>多种音色选择，自动生成专业配音</p>
+                    </div>
+                    <div class="preview-card">
+                        <i class="fas fa-cut"></i>
+                        <h3>自动剪辑</h3>
+                        <p>智能场景切换，专业级视频剪辑效果</p>
+                    </div>
+                </div>
+                
+                <div class="coming-soon-status">
+                    <div class="status-badge">
+                        <i class="fas fa-rocket"></i>
+                        即将上线
+                    </div>
+                    <p class="status-text">功能正在紧张开发中，敬请期待！</p>
+                </div>
+                
+                <div class="contact-prompt">
+                    <p>想要第一时间体验新功能？</p>
+                    <button class="contact-btn" onclick="showWechatContact()">
+                        <i class="fab fa-weixin"></i>
+                        关注微信服务号
+                    </button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- 微信联系弹窗 -->
+    <div class="modal hidden" id="contactModal">
+        <div class="modal-overlay" id="contactOverlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>关注微信服务号</h3>
+                <button class="modal-close" id="contactClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="qr-container">
+                    <div class="qr-code">
+                        <img src="qrcode_for_gh_ede2796af721_258.jpg" alt="微信服务号二维码" style="width: 100%; height: 100%; object-fit: cover; border-radius: 0.5rem;">
+                    </div>
+                    <p class="qr-tip">扫描二维码关注服务号，获取最新功能更新</p>
+                </div>
+                <div class="contact-info">
+                    <div class="info-item">
+                        <i class="fas fa-user"></i>
+                        <div>
+                            <strong>联系人：谢旭涵</strong>
+                            <span>VP</span>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-phone"></i>
+                        <div>
+                            <strong>联系电话：18933063380</strong>
+                            <span>微信同号</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        // 显示微信联系弹窗
+        function showWechatContact() {
+            const contactModal = document.getElementById('contactModal');
+            showModal(contactModal);
+        }
+
+        // 初始化联系弹窗
+        document.addEventListener('DOMContentLoaded', function() {
+            const contactOverlay = document.getElementById('contactOverlay');
+            const contactClose = document.getElementById('contactClose');
+            const contactModal = document.getElementById('contactModal');
+            
+            [contactOverlay, contactClose].forEach(element => {
+                if (element) {
+                    element.addEventListener('click', () => hideModal(contactModal));
+                }
+            });
+        });
+    </script>
+</body>
+</html>

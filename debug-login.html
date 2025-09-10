@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录调试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .debug-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-btn {
+            background: linear-gradient(135deg, #07c160 0%, #00d4aa 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .test-btn:hover {
+            background: linear-gradient(135deg, #06ad56 0%, #00c49a 100%);
+        }
+        .wechat-icon {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <h1>微信登录调试页面</h1>
+        
+        <button class="test-btn" id="testLoginBtn">
+            <svg class="wechat-icon" viewBox="0 0 24 24" width="18" height="18">
+                <path fill="currentColor" d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.162 4.203 2.969 5.522L2.25 17.25l2.844-1.406c.75.188 1.547.281 2.397.281.281 0 .562-.016.844-.047C8.594 18.891 11.297 20.812 14.5 20.812c.75 0 1.5-.094 2.203-.281L19.547 22l-.703-2.219C20.234 18.5 21 17.125 21 15.562c0-3.094-2.734-5.625-6.094-5.625-.406 0-.813.031-1.203.094C12.875 4.25 11.062 2.188 8.691 2.188zm0 1.5c2.047 0 3.844 1.203 4.594 2.906.031.063.047.125.078.188C12.594 6.688 12 6.625 11.406 6.625c-3.953 0-7.156 2.797-7.156 6.25 0 .422.063.844.156 1.25C2.219 13.281 1.5 11.5 1.5 9.53c0-3.219 3.094-5.844 7.191-5.844zm5.809 8.937c2.953 0 5.344 2.016 5.344 4.5 0 1.031-.422 2-.969 2.781l.5 1.5-1.5-.75c-.5.125-1.016.188-1.531.188-2.953 0-5.344-2.016-5.344-4.5s2.391-4.719 5.5-4.719z"/>
+            </svg>
+            测试微信登录
+        </button>
+        
+        <div class="log" id="debugLog">点击按钮开始测试...</div>
+        
+        <h3>检查项目:</h3>
+        <ul>
+            <li>按钮点击事件是否触发</li>
+            <li>showWechatLogin函数是否执行</li>
+            <li>WECHAT_APPID变量是否定义</li>
+            <li>登录弹窗是否显示</li>
+            <li>二维码是否生成</li>
+        </ul>
+    </div>
+
+    <script>
+        // 微信配置
+        const WECHAT_APPID = 'wx2e1f9ccab9e27176';
+        const WECHAT_SECRET = '2b0086643a47fe0de574efbfc27c0718';
+        
+        const debugLog = document.getElementById('debugLog');
+        
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            debugLog.textContent += `[${timestamp}] ${message}\n`;
+        }
+        
+        function generateRandomState() {
+            return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        }
+        
+        function testWechatLogin() {
+            log('开始测试微信登录...');
+            
+            try {
+                log(`WECHAT_APPID: ${WECHAT_APPID}`);
+                
+                // 生成授权URL
+                const state = generateRandomState();
+                log(`生成state: ${state}`);
+                
+                const redirectUri = encodeURIComponent('https://aimorelogy.github.io/wechat-callback.html');
+                const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${WECHAT_APPID}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_userinfo&state=${state}#wechat_redirect`;
+                
+                log(`授权URL: ${authUrl}`);
+                
+                // 生成二维码
+                const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(authUrl)}`;
+                log(`二维码API URL: ${qrApiUrl}`);
+                
+                // 创建二维码显示
+                const qrContainer = document.createElement('div');
+                qrContainer.innerHTML = `
+                    <h3>生成的二维码:</h3>
+                    <img src="${qrApiUrl}" alt="微信登录二维码" style="border: 1px solid #ddd; border-radius: 4px;">
+                    <p>请使用微信扫描二维码测试</p>
+                `;
+                document.querySelector('.debug-container').appendChild(qrContainer);
+                
+                log('二维码生成成功！');
+                
+            } catch (error) {
+                log(`错误: ${error.message}`);
+                console.error('微信登录测试错误:', error);
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const testBtn = document.getElementById('testLoginBtn');
+            
+            if (testBtn) {
+                log('找到测试按钮，绑定事件监听器...');
+                testBtn.addEventListener('click', function() {
+                    log('按钮被点击！');
+                    testWechatLogin();
+                });
+            } else {
+                log('错误: 找不到测试按钮！');
+            }
+        });
+    </script>
+</body>
+</html>

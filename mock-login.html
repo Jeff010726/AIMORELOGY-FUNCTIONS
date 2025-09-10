@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模拟登录测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%);
+            color: white;
+            margin: 0;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            padding: 2rem;
+            border: 1px solid rgba(0, 255, 136, 0.2);
+        }
+        h1 {
+            text-align: center;
+            color: #00ff88;
+            margin-bottom: 2rem;
+        }
+        .user-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 1rem 0;
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .user-card:hover {
+            background: rgba(0, 255, 136, 0.1);
+            transform: translateY(-2px);
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00ff88, #00a8ff);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #0a0a0f;
+        }
+        .user-details h3 {
+            margin: 0;
+            color: #00ff88;
+        }
+        .user-details p {
+            margin: 0.25rem 0;
+            color: #b8bcc8;
+            font-size: 0.9rem;
+        }
+        .level-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        .level-normal { background: #666; color: white; }
+        .level-vip { background: #ffd700; color: #0a0a0f; }
+        .level-svip { background: #ff6b35; color: white; }
+        .level-admin { background: #ff3366; color: white; }
+        .result {
+            margin-top: 2rem;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            text-align: center;
+        }
+        .success {
+            background: rgba(0, 255, 136, 0.2);
+            border: 1px solid #00ff88;
+            color: #00ff88;
+        }
+        button {
+            background: linear-gradient(135deg, #00ff88, #00a8ff);
+            color: #0a0a0f;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 0.5rem;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 255, 136, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 模拟登录测试</h1>
+        <p style="text-align: center; color: #b8bcc8; margin-bottom: 2rem;">
+            选择一个用户进行模拟登录，用于测试系统功能
+        </p>
+
+        <div class="user-card" onclick="mockLogin('normal')">
+            <div class="user-info">
+                <div class="avatar">普</div>
+                <div class="user-details">
+                    <h3>普通用户</h3>
+                    <p>等级: <span class="level-badge level-normal">普通用户</span></p>
+                    <p>每日使用次数: 10次</p>
+                    <p>OpenID: mock_normal_user_001</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="user-card" onclick="mockLogin('vip')">
+            <div class="user-info">
+                <div class="avatar">V</div>
+                <div class="user-details">
+                    <h3>VIP用户</h3>
+                    <p>等级: <span class="level-badge level-vip">VIP</span></p>
+                    <p>每日使用次数: 50次</p>
+                    <p>OpenID: mock_vip_user_001</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="user-card" onclick="mockLogin('svip')">
+            <div class="user-info">
+                <div class="avatar">S</div>
+                <div class="user-details">
+                    <h3>SVIP用户</h3>
+                    <p>等级: <span class="level-badge level-svip">SVIP</span></p>
+                    <p>每日使用次数: 200次</p>
+                    <p>OpenID: mock_svip_user_001</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="user-card" onclick="mockLogin('admin')">
+            <div class="user-info">
+                <div class="avatar">A</div>
+                <div class="user-details">
+                    <h3>管理员</h3>
+                    <p>等级: <span class="level-badge level-admin">Admin</span></p>
+                    <p>每日使用次数: 无限制</p>
+                    <p>OpenID: mock_admin_user_001</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="result"></div>
+
+        <div style="text-align: center; margin-top: 2rem;">
+            <button onclick="clearLogin()">清除登录状态</button>
+            <button onclick="window.open('index.html', '_blank')">打开主页面</button>
+        </div>
+    </div>
+
+    <script>
+        // 模拟用户数据
+        const mockUsers = {
+            normal: {
+                openid: 'mock_normal_user_001',
+                nickname: '普通用户',
+                headimgurl: 'https://via.placeholder.com/64x64/666666/ffffff?text=普',
+                level: '普通用户',
+                usageCount: 0,
+                maxUsage: 10,
+                loginTime: Date.now(),
+                subscribe: 1,
+                subscribe_time: Date.now() / 1000 - 86400 // 1天前关注
+            },
+            vip: {
+                openid: 'mock_vip_user_001',
+                nickname: 'VIP用户',
+                headimgurl: 'https://via.placeholder.com/64x64/ffd700/000000?text=V',
+                level: 'VIP',
+                usageCount: 0,
+                maxUsage: 50,
+                loginTime: Date.now(),
+                subscribe: 1,
+                subscribe_time: Date.now() / 1000 - 86400 * 45 // 45天前关注
+            },
+            svip: {
+                openid: 'mock_svip_user_001',
+                nickname: 'SVIP用户',
+                headimgurl: 'https://via.placeholder.com/64x64/ff6b35/ffffff?text=S',
+                level: 'SVIP',
+                usageCount: 0,
+                maxUsage: 200,
+                loginTime: Date.now(),
+                subscribe: 1,
+                subscribe_time: Date.now() / 1000 - 86400 * 400 // 400天前关注
+            },
+            admin: {
+                openid: 'mock_admin_user_001',
+                nickname: '系统管理员',
+                headimgurl: 'https://via.placeholder.com/64x64/ff3366/ffffff?text=A',
+                level: 'Admin',
+                usageCount: 0,
+                maxUsage: 999999,
+                loginTime: Date.now(),
+                subscribe: 1,
+                subscribe_time: Date.now() / 1000 - 86400 * 365 // 1年前关注
+            }
+        };
+
+        // 模拟登录
+        function mockLogin(userType) {
+            const user = mockUsers[userType];
+            
+            // 保存用户信息到localStorage
+            localStorage.setItem('wechat_auth_result', JSON.stringify({
+                success: true,
+                userInfo: user
+            }));
+
+            // 显示成功信息
+            const result = document.getElementById('result');
+            result.className = 'result success';
+            result.innerHTML = `
+                <h3>✅ 模拟登录成功！</h3>
+                <p>用户: ${user.nickname}</p>
+                <p>等级: ${user.level}</p>
+                <p>使用次数: ${user.usageCount}/${user.maxUsage}</p>
+                <p>OpenID: ${user.openid}</p>
+                <p style="margin-top: 1rem; font-size: 0.9rem; color: #b8bcc8;">
+                    登录信息已保存到localStorage，现在可以在主页面使用该用户身份
+                </p>
+            `;
+
+            // 通知父窗口（如果有的话）
+            if (window.opener) {
+                window.opener.postMessage({
+                    type: 'wechat_login_success',
+                    userInfo: user
+                }, '*');
+            }
+        }
+
+        // 清除登录状态
+        function clearLogin() {
+            localStorage.removeItem('wechat_auth_result');
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('userUsageCount');
+            
+            const result = document.getElementById('result');
+            result.className = 'result';
+            result.innerHTML = `
+                <p style="color: #b8bcc8;">登录状态已清除</p>
+            `;
+        }
+
+        // 页面加载时检查当前登录状态
+        document.addEventListener('DOMContentLoaded', () => {
+            const authResult = localStorage.getItem('wechat_auth_result');
+            if (authResult) {
+                try {
+                    const data = JSON.parse(authResult);
+                    if (data.success) {
+                        const result = document.getElementById('result');
+                        result.className = 'result success';
+                        result.innerHTML = `
+                            <h3>当前已登录</h3>
+                            <p>用户: ${data.userInfo.nickname}</p>
+                            <p>等级: ${data.userInfo.level}</p>
+                        `;
+                    }
+                } catch (error) {
+                    console.error('解析登录状态失败:', error);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
