@@ -551,7 +551,7 @@ function generateWechatAuthQR() {
         localStorage.setItem('wechat_auth_state', state);
         
         // 使用配置的授权回调域名（需要在微信公众平台后台配置）
-        const redirectUri = encodeURIComponent('https://aimorelogy.github.io/wechat-callback.html');
+        const redirectUri = encodeURIComponent('https://jeff010726.github.io/AIMORELOGY-FUNCTIONS/wechat-callback.html');
         const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${WECHAT_APPID}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_userinfo&state=${state}#wechat_redirect`;
         
         // 显示加载状态

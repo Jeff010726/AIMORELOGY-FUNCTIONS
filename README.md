@@ -38,7 +38,7 @@
 
 项目使用微信服务号进行用户认证：
 - AppID: `wx2e1f9ccab9e27176`
-- 授权回调域名: `aimorelogy.github.io`
+- 授权回调域名: `jeff010726.github.io`
 
 ## 技术栈
 
