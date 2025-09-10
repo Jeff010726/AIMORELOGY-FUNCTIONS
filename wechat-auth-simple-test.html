@@ -124,7 +124,7 @@
         // 生成授权链接
         function generateAuthUrl() {
             const state = Math.random().toString(36).substring(2, 15);
-            const redirectUri = `${window.location.origin}/AIMORELOGY-FUNCTIONS/wechat-callback-debug.html`;
+            const redirectUri = 'https://jeff010726.github.io/AIMORELOGY-FUNCTIONS/wechat-callback-debug.html';
             
             const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${WECHAT_APPID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=snsapi_userinfo&state=${state}#wechat_redirect`;
 
@@ -147,7 +147,7 @@ Scope: snsapi_userinfo</pre>
             const state = 'test_' + Date.now();
             localStorage.setItem('wechat_auth_state', state);
             
-            const redirectUri = `${window.location.origin}/AIMORELOGY-FUNCTIONS/wechat-callback-debug.html`;
+            const redirectUri = 'https://jeff010726.github.io/AIMORELOGY-FUNCTIONS/wechat-callback-debug.html';
             const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${WECHAT_APPID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=snsapi_userinfo&state=${state}#wechat_redirect`;
 
             document.getElementById('directAuthResult').innerHTML = `
