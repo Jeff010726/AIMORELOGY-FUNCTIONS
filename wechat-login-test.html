@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微信登录测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%);
+            color: white;
+            margin: 0;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .title {
+            text-align: center;
+            font-size: 2rem;
+            margin-bottom: 2rem;
+            color: #00ff88;
+        }
+        
+        .test-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .section-title {
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            color: #00ff88;
+        }
+        
+        .button {
+            background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
+            color: #0a0a0f;
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 0.5rem;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 255, 136, 0.3);
+        }
+        
+        .button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .button.secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            color: white;
+        }
+        
+        .result {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        .success {
+            border-left: 4px solid #00ff88;
+        }
+        
+        .error {
+            border-left: 4px solid #ff3366;
+        }
+        
+        .info {
+            border-left: 4px solid #007bff;
+        }
+        
+        .user-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .user-info-item {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.75rem;
+            border-radius: 8px;
+        }
+        
+        .user-info-label {
+            font-size: 0.8rem;
+            color: #b8bcc8;
+            margin-bottom: 0.25rem;
+        }
+        
+        .user-info-value {
+            font-weight: 600;
+        }
+        
+        .qr-code {
+            text-align: center;
+            margin: 1rem 0;
+        }
+        
+        .qr-code img {
+            max-width: 200px;
+            border-radius: 8px;
+            border: 2px solid #00ff88;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">微信登录功能测试</h1>
+        
+        <!-- 配置检查 -->
+        <div class="test-section">
+            <h2 class="section-title">1. 配置检查</h2>
+            <button class="button" onclick="checkConfig()">检查配置</button>
+            <div id="configResult" class="result" style="display: none;"></div>
+        </div>
+        
+        <!-- 生成授权URL测试 -->
+        <div class="test-section">
+            <h2 class="section-title">2. 生成授权URL测试</h2>
+            <button class="button" onclick="testGenerateAuthUrl()">生成授权URL</button>
+            <div id="authUrlResult" class="result" style="display: none;"></div>
+        </div>
+        
+        <!-- 微信登录测试 -->
+        <div class="test-section">
+            <h2 class="section-title">3. 微信登录测试</h2>
+            <button class="button" onclick="startWechatLogin()">开始微信登录</button>
+            <button class="button secondary" onclick="clearLoginData()">清除登录数据</button>
+            <div id="loginResult" class="result" style="display: none;"></div>
+            <div id="userInfoDisplay" style="display: none;">
+                <h3>用户信息：</h3>
+                <div id="userInfoGrid" class="user-info"></div>
+            </div>
+        </div>
+        
+        <!-- 管理员登录测试 -->
+        <div class="test-section">
+            <h2 class="section-title">4. 管理员登录测试</h2>
+            <button class="button" onclick="testAdminLogin()">测试管理员登录</button>
+            <button class="button secondary" onclick="openAdminLogin()">打开管理员登录页面</button>
+            <div id="adminResult" class="result" style="display: none;"></div>
+        </div>
+        
+        <!-- 当前登录状态 -->
+        <div class="test-section">
+            <h2 class="section-title">5. 当前登录状态</h2>
+            <button class="button" onclick="checkLoginStatus()">检查登录状态</button>
+            <div id="statusResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // 配置
+        const WECHAT_APPID = 'wx2e1f9ccab9e27176';
+        const WORKER_URL = 'https://ecommerce-api.jeff010726bd.workers.dev';
+        const CALLBACK_URL = window.location.origin + '/wechat-callback.html';
+        
+        // 检查配置
+        function checkConfig() {
+            const result = document.getElementById('configResult');
+            result.style.display = 'block';
+            
+            let configInfo = `配置信息检查：
+微信 AppID: ${WECHAT_APPID}
+Cloudflare Workers URL: ${WORKER_URL}
+回调地址: ${CALLBACK_URL}
+当前域名: ${window.location.origin}
+
+检查项目：
+✓ AppID 已配置
+${WORKER_URL.includes('your-worker') ? '❌ Workers URL 需要替换为实际地址' : '✓ Workers URL 已配置'}
+✓ 回调地址已生成
+${window.location.protocol === 'https:' ? '✓ 使用 HTTPS 协议' : '❌ 需要使用 HTTPS 协议'}`;
+            
+            result.textContent = configInfo;
+            result.className = 'result info';
+        }
+        
+        // 测试生成授权URL
+        async function testGenerateAuthUrl() {
+            const result = document.getElementById('authUrlResult');
+            result.style.display = 'block';
+            result.textContent = '正在生成授权URL...';
+            result.className = 'result info';
+            
+            try {
+                const response = await fetch(`${WORKER_URL}/wechat/auth-url?redirect_uri=${encodeURIComponent(CALLBACK_URL)}&scope=snsapi_userinfo`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    result.textContent = `授权URL生成成功：
+URL: ${data.authUrl}
+State: ${data.state}
+
+注意：此URL应该在微信客户端中打开才能正常工作。`;
+                    result.className = 'result success';
+                } else {
+                    result.textContent = `生成失败：${data.message}`;
+                    result.className = 'result error';
+                }
+            } catch (error) {
+                result.textContent = `请求失败：${error.message}
+请检查 Cloudflare Workers 是否正确部署。`;
+                result.className = 'result error';
+            }
+        }
+        
+        // 开始微信登录
+        async function startWechatLogin() {
+            const result = document.getElementById('loginResult');
+            result.style.display = 'block';
+            result.textContent = '正在生成登录二维码...';
+            result.className = 'result info';
+            
+            try {
+                // 生成授权URL
+                const response = await fetch(`${WORKER_URL}/wechat/auth-url?redirect_uri=${encodeURIComponent(CALLBACK_URL)}&scope=snsapi_userinfo`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    // 保存state
+                    localStorage.setItem('wechat_auth_state', data.state);
+                    
+                    // 在新窗口中打开授权页面
+                    const authWindow = window.open(data.authUrl, 'wechat_auth', 'width=400,height=600');
+                    
+                    result.innerHTML = `微信登录窗口已打开
+请在新窗口中完成微信授权登录。
+
+如果窗口没有打开，请点击下面的链接：
+<a href="${data.authUrl}" target="_blank" style="color: #00ff88;">打开微信登录</a>
+
+State: ${data.state}`;
+                    result.className = 'result success';
+                    
+                    // 监听登录结果
+                    window.addEventListener('message', function(event) {
+                        if (event.data.type === 'wechat_login_success') {
+                            result.textContent = '微信登录成功！';
+                            result.className = 'result success';
+                            displayUserInfo(event.data.userInfo);
+                            if (authWindow) authWindow.close();
+                        }
+                    });
+                    
+                } else {
+                    result.textContent = `生成登录链接失败：${data.message}`;
+                    result.className = 'result error';
+                }
+            } catch (error) {
+                result.textContent = `登录失败：${error.message}`;
+                result.className = 'result error';
+            }
+        }
+        
+        // 测试管理员登录
+        async function testAdminLogin() {
+            const result = document.getElementById('adminResult');
+            result.style.display = 'block';
+            result.textContent = '正在测试管理员登录...';
+            result.className = 'result info';
+            
+            try {
+                const response = await fetch(`${WORKER_URL}/admin/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: 'admin',
+                        password: 'Blackrail200107.'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    result.textContent = `管理员登录成功！
+用户信息：${JSON.stringify(data.userInfo, null, 2)}`;
+                    result.className = 'result success';
+                    
+                    // 保存登录信息
+                    localStorage.setItem('wechat_auth_result', JSON.stringify({
+                        success: true,
+                        userInfo: data.userInfo
+                    }));
+                    
+                    displayUserInfo(data.userInfo);
+                } else {
+                    result.textContent = `管理员登录失败：${data.message}`;
+                    result.className = 'result error';
+                }
+            } catch (error) {
+                result.textContent = `请求失败：${error.message}`;
+                result.className = 'result error';
+            }
+        }
+        
+        // 打开管理员登录页面
+        function openAdminLogin() {
+            window.open('admin-login.html', '_blank');
+        }
+        
+        // 检查登录状态
+        function checkLoginStatus() {
+            const result = document.getElementById('statusResult');
+            result.style.display = 'block';
+            
+            const authResult = localStorage.getItem('wechat_auth_result');
+            
+            if (authResult) {
+                try {
+                    const data = JSON.parse(authResult);
+                    if (data.success && data.userInfo) {
+                        result.textContent = `当前已登录
+用户信息：${JSON.stringify(data.userInfo, null, 2)}`;
+                        result.className = 'result success';
+                        displayUserInfo(data.userInfo);
+                    } else {
+                        result.textContent = '登录数据异常';
+                        result.className = 'result error';
+                    }
+                } catch (error) {
+                    result.textContent = '登录数据解析失败';
+                    result.className = 'result error';
+                }
+            } else {
+                result.textContent = '当前未登录';
+                result.className = 'result info';
+                document.getElementById('userInfoDisplay').style.display = 'none';
+            }
+        }
+        
+        // 清除登录数据
+        function clearLoginData() {
+            localStorage.removeItem('wechat_auth_result');
+            localStorage.removeItem('wechat_auth_state');
+            
+            const result = document.getElementById('loginResult');
+            result.style.display = 'block';
+            result.textContent = '登录数据已清除';
+            result.className = 'result info';
+            
+            document.getElementById('userInfoDisplay').style.display = 'none';
+        }
+        
+        // 显示用户信息
+        function displayUserInfo(userInfo) {
+            const display = document.getElementById('userInfoDisplay');
+            const grid = document.getElementById('userInfoGrid');
+            
+            grid.innerHTML = '';
+            
+            const fields = [
+                { label: '昵称', key: 'nickname' },
+                { label: '用户等级', key: 'level' },
+                { label: '最大使用次数', key: 'maxUsage' },
+                { label: '已使用次数', key: 'usageCount' },
+                { label: 'OpenID', key: 'openid' },
+                { label: '性别', key: 'sex', format: (v) => v === 1 ? '男' : v === 2 ? '女' : '未知' },
+                { label: '城市', key: 'city' },
+                { label: '省份', key: 'province' },
+                { label: '国家', key: 'country' },
+                { label: '关注状态', key: 'subscribe', format: (v) => v === 1 ? '已关注' : '未关注' },
+                { label: '登录时间', key: 'loginTime', format: (v) => new Date(v).toLocaleString() }
+            ];
+            
+            fields.forEach(field => {
+                if (userInfo[field.key] !== undefined) {
+                    const item = document.createElement('div');
+                    item.className = 'user-info-item';
+                    
+                    const label = document.createElement('div');
+                    label.className = 'user-info-label';
+                    label.textContent = field.label;
+                    
+                    const value = document.createElement('div');
+                    value.className = 'user-info-value';
+                    value.textContent = field.format ? field.format(userInfo[field.key]) : userInfo[field.key];
+                    
+                    item.appendChild(label);
+                    item.appendChild(value);
+                    grid.appendChild(item);
+                }
+            });
+            
+            display.style.display = 'block';
+        }
+        
+        // 页面加载时检查登录状态
+        window.addEventListener('load', function() {
+            checkLoginStatus();
+        });
+    </script>
+</body>
+</html>
