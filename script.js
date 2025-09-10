@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- Configuration ---
+    const CLIENT_VERSION = "v5-diagnostic";
     const WORKER_URL = 'https://ecommerce-api.jeff010726bd.workers.dev';
 
     // --- DOM Elements ---
@@ -177,6 +178,28 @@ document.addEventListener('DOMContentLoaded', () => {
     modalOverlay.addEventListener('click', hideModal);
     modalClose.addEventListener('click', hideModal);
 
+    // --- Version Diagnostics ---
+    async function displayVersion() {
+        const clientVersionEl = document.getElementById('client-version');
+        const workerVersionEl = document.getElementById('worker-version');
+        
+        if (clientVersionEl) clientVersionEl.textContent = CLIENT_VERSION;
+        if (!workerVersionEl) return;
+
+        try {
+            const response = await fetch(`${WORKER_URL}/version`);
+            if (response.ok) {
+                const data = await response.json();
+                workerVersionEl.textContent = data.version || 'unknown';
+            } else {
+                workerVersionEl.textContent = `Error ${response.status}`;
+            }
+        } catch (e) {
+            workerVersionEl.textContent = 'Unreachable';
+        }
+    }
+
     // --- Initial Load ---
     checkLoginStatus();
+    displayVersion();
 });

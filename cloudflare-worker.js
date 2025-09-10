@@ -1,7 +1,9 @@
-// Cloudflare Workers 脚本 - 微信扫码登录 (v3 - 增强容错最终版)
+// Cloudflare Workers 脚本 - 微信扫码登录 (v5-diagnostic)
 // 功能: 生成二维码 -> 接收扫码/关注事件 -> 前端轮询状态 -> 登录成功
-// 新增: 增强的错误处理和状态反馈机制，防止Worker崩溃并在前端显示具体错误。
+// 新增: 添加 /version 接口用于诊断缓存问题。
 // 依赖: Cloudflare KV, 环境变量 (APPID, APPSECRET, ALLOWED_ORIGINS, WECHAT_TOKEN)
+
+const SCRIPT_VERSION = "v5-diagnostic";
 
 // --- 微信API地址 ---
 const WECHAT_API = {
@@ -26,7 +28,9 @@ export default {
                  throw new Error("关键配置缺失: 请检查Worker的KV绑定和环境变量 (APPID, APPSECRET, WECHAT_TOKEN)。");
             }
 
-            if (url.pathname === '/wechat/event' && request.method === 'GET') {
+            if (url.pathname === '/version' && request.method === 'GET') {
+                response = new Response(JSON.stringify({ success: true, version: SCRIPT_VERSION }), { status: 200 });
+            } else if (url.pathname === '/wechat/event' && request.method === 'GET') {
                 response = await handleWechatValidation(request, env);
             } else if (url.pathname === '/wechat/event' && request.method === 'POST') {
                 response = await handleWechatEvent(request, env, ctx);
