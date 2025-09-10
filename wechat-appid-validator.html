@@ -114,6 +114,8 @@ AppID: wx2e1f9ccab9e27176
 
         function testBaseScope() {
             const state = generateState();
+            // 保存state到localStorage用于回调验证
+            localStorage.setItem('wechat_auth_state', state);
             const url = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${APPID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=snsapi_base&state=${state}#wechat_redirect`;
             
             const result = document.getElementById('baseResult');
@@ -133,6 +135,8 @@ AppID: wx2e1f9ccab9e27176
 
         function testUserinfoScope() {
             const state = generateState();
+            // 保存state到localStorage用于回调验证
+            localStorage.setItem('wechat_auth_state', state);
             const url = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${APPID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=snsapi_userinfo&state=${state}#wechat_redirect`;
             
             const result = document.getElementById('userinfoResult');
@@ -152,6 +156,8 @@ AppID: wx2e1f9ccab9e27176
 
         function testSimpleAuth() {
             const state = generateState();
+            // 保存state到localStorage用于回调验证
+            localStorage.setItem('wechat_auth_state', state);
             const url = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${APPID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=snsapi_base&state=${state}`;
             
             const result = document.getElementById('simpleResult');
