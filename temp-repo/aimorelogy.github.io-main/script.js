@@ -932,7 +932,8 @@ class WechatLoginIntegration {
 
     async startLogin() {
         try {
-            const redirectUri = `${window.location.origin}/AIMORELOGY-FUNCTIONS/wechat-callback.html`;
+            // Hardcode the production redirect URI to ensure it works in all environments
+            const redirectUri = `https://jeff010726.github.io/AIMORELOGY-FUNCTIONS/wechat-callback.html`;
             const authUrl = await this.wechatAuth.generateAuthUrl(redirectUri, 'snsapi_userinfo');
             window.location.href = authUrl;
         } catch (error) {
