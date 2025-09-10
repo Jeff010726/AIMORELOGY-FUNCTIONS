@@ -1,14 +1,5 @@
-// Cloudflare Workers 脚本 - 处理微信授权 (v4 - CORS修复版)
-// 警告：密钥硬编码存在严重安全风险，仅供临时调试使用。
-// 此版本修复了CORS预检请求处理，解决 "Failed to fetch" 问题。
-
-// --- 配置 (硬编码) ---
-const APP_CONFIG = {
-    APPID: 'wx2e1f9ccab9e27176',
-    APPSECRET: '2b0086643a47fe0de574efbfc27c0718',
-    // 调试时临时改为通配符，解决CORS问题。成功后建议改回 'https://jeff010726.github.io'
-    ALLOWED_ORIGINS: '*'
-};
+// Cloudflare Workers 脚本 - 处理微信授权 (v5 - 生产环境安全版)
+// 使用环境变量管理密钥，并提供更安全的CORS策略。
 
 // 微信API地址
 const WECHAT_API = {
@@ -29,15 +20,22 @@ export default {
         let response;
         const url = new URL(request.url);
 
-        if (url.pathname === '/wechat/auth' && request.method === 'POST') {
-            response = await handleAuthRequest(request, env);
-        } else {
-            response = new Response(JSON.stringify({ success: false, message: 'Not Found' }), { status: 404 });
+        try {
+            if (url.pathname === '/wechat/auth-url' && request.method === 'GET') {
+                response = await handleAuthUrlRequest(request, env);
+            } else if (url.pathname === '/wechat/auth' && request.method === 'POST') {
+                response = await handleAuthRequest(request, env);
+            } else {
+                response = new Response(JSON.stringify({ success: false, message: 'Not Found' }), { status: 404 });
+            }
+        } catch (error) {
+            console.error('Unhandled error:', error);
+            response = new Response(JSON.stringify({ success: false, message: `Internal Server Error: ${error.message}` }), { status: 500 });
         }
         
         // 为所有响应附加CORS头
         const newHeaders = new Headers(response.headers);
-        const cors = corsHeaders(request);
+        const cors = corsHeaders(request, env);
         Object.keys(cors).forEach(key => {
             newHeaders.set(key, cors[key]);
         });
@@ -51,6 +49,22 @@ export default {
 };
 
 // --- 业务逻辑处理器 ---
+
+async function handleAuthUrlRequest(request, env) {
+    const url = new URL(request.url);
+    const redirectUri = url.searchParams.get('redirect_uri');
+    const scope = url.searchParams.get('scope') || 'snsapi_userinfo';
+    
+    if (!redirectUri) {
+        return new Response(JSON.stringify({ success: false, message: 'Missing redirect_uri' }), { status: 400 });
+    }
+
+    const state = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+    const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${env.APPID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}#wechat_redirect`;
+
+    return new Response(JSON.stringify({ success: true, authUrl, state }), { status: 200 });
+}
+
 async function handleAuthRequest(request, env) {
     try {
         const { code } = await request.json();
@@ -58,7 +72,7 @@ async function handleAuthRequest(request, env) {
             return new Response(JSON.stringify({ success: false, message: 'Missing `code` parameter' }), { status: 400 });
         }
 
-        const oauth2TokenData = await getOauth2AccessToken(code);
+        const oauth2TokenData = await getOauth2AccessToken(code, env);
         if (!oauth2TokenData.success) {
             return new Response(JSON.stringify(oauth2TokenData), { status: 500 });
         }
@@ -103,8 +117,8 @@ async function handleAuthRequest(request, env) {
 
 // --- 辅助函数 ---
 
-async function getOauth2AccessToken(code) {
-    const url = `${WECHAT_API.oauth2AccessToken}?appid=${APP_CONFIG.APPID}&secret=${APP_CONFIG.APPSECRET}&code=${code}&grant_type=authorization_code`;
+async function getOauth2AccessToken(code, env) {
+    const url = `${WECHAT_API.oauth2AccessToken}?appid=${env.APPID}&secret=${env.APPSECRET}&code=${code}&grant_type=authorization_code`;
     const response = await fetch(url);
     const data = await response.json();
     if (data.errcode) {
@@ -152,7 +166,7 @@ async function getGlobalAccessToken(env) {
         }
     }
 
-    const url = `${WECHAT_API.accessToken}?grant_type=client_credential&appid=${APP_CONFIG.APPID}&secret=${APP_CONFIG.APPSECRET}`;
+    const url = `${WECHAT_API.accessToken}?grant_type=client_credential&appid=${env.APPID}&secret=${env.APPSECRET}`;
     const tokenResponse = await fetch(url);
     const tokenData = await tokenResponse.json();
 
@@ -174,12 +188,16 @@ async function getGlobalAccessToken(env) {
     return { success: true, data: cacheData };
 }
 
-// --- CORS 处理 (v4 修复版) ---
-function corsHeaders(request) {
+// --- CORS 处理 ---
+function corsHeaders(request, env) {
+    // 环境变量中读取允许的源，提供默认值
+    const allowedOrigin = env.ALLOWED_ORIGINS || 'https://jeff010726.github.io';
+
     return {
-        'Access-Control-Allow-Origin': APP_CONFIG.ALLOWED_ORIGINS,
+        'Access-Control-Allow-Origin': allowedOrigin,
         'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
         'Access-Control-Allow-Headers': request.headers.get('Access-Control-Request-Headers') || 'Content-Type',
+        'Access-Control-Allow-Credentials': 'true' // 如果需要，可以允许凭证
     };
 }
 

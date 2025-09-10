@@ -844,6 +844,122 @@ class PerformanceMonitor {
     }
 }
 
+// === WECHAT LOGIN INTEGRATION ===
+class WechatLoginIntegration {
+    constructor(navMenuSelector, ctaSelector) {
+        this.navMenu = $(navMenuSelector);
+        this.ctaButton = $(ctaSelector);
+        this.userInfo = null;
+        this.init();
+    }
+
+    init() {
+        this.checkLoginStatus();
+        this.setupLoginButton();
+        this.listenForCallback();
+    }
+
+    checkLoginStatus() {
+        const storedData = localStorage.getItem('wechat_auth_result');
+        if (storedData) {
+            try {
+                const data = JSON.parse(storedData);
+                if (data.success && data.userInfo) {
+                    this.userInfo = data.userInfo;
+                    console.log('Logged in user:', this.userInfo);
+                }
+            } catch (e) {
+                localStorage.removeItem('wechat_auth_result');
+            }
+        }
+    }
+
+    setupLoginButton() {
+        if (this.userInfo) {
+            this.renderUserProfile();
+        } else {
+            this.renderLoginButton();
+        }
+    }
+
+    renderLoginButton() {
+        if (!this.navMenu || !this.ctaButton) return;
+
+        const loginButton = document.createElement('a');
+        loginButton.href = '#';
+        loginButton.className = 'nav-link wechat-login-btn';
+        loginButton.innerHTML = '<i class="fab fa-weixin"></i> 微信登录';
+        loginButton.onclick = (e) => {
+            e.preventDefault();
+            this.startLogin();
+        };
+
+        this.ctaButton.insertAdjacentElement('beforebegin', loginButton);
+    }
+
+    renderUserProfile() {
+        if (!this.navMenu || !this.ctaButton) return;
+        
+        // Hide login and CTA button
+        const loginBtn = $('.wechat-login-btn');
+        if(loginBtn) loginBtn.remove();
+        this.ctaButton.style.display = 'none';
+
+        const profileContainer = document.createElement('div');
+        profileContainer.className = 'user-profile';
+        
+        profileContainer.innerHTML = `
+            <img src="${this.userInfo.headimgurl}" alt="${this.userInfo.nickname}" class="avatar">
+            <span class="nickname">${this.userInfo.nickname}</span>
+            <div class="dropdown-menu">
+                <a href="#" id="logoutBtn">退出登录</a>
+            </div>
+        `;
+
+        this.navMenu.appendChild(profileContainer);
+
+        $('#logoutBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.logout();
+        });
+    }
+
+    async startLogin() {
+        try {
+            const redirectUri = `${window.location.origin}/AIMORELOGY-FUNCTIONS/wechat-callback.html`;
+            const authUrl = await wechatAuth.generateAuthUrl(redirectUri, 'snsapi_userinfo');
+            window.location.href = authUrl;
+        } catch (error) {
+            console.error('微信登录启动失败:', error);
+            createToast('error', '无法启动微信登录，请稍后重试。');
+        }
+    }
+
+    listenForCallback() {
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'wechat_login_success') {
+                this.userInfo = event.data.userInfo;
+                localStorage.setItem('wechat_auth_result', JSON.stringify({ success: true, userInfo: this.userInfo }));
+                this.setupLoginButton();
+            }
+        }, false);
+    }
+
+    logout() {
+        localStorage.removeItem('wechat_auth_result');
+        this.userInfo = null;
+        
+        // Clean up UI
+        const profile = $('.user-profile');
+        if(profile) profile.remove();
+        this.ctaButton.style.display = '';
+
+        this.renderLoginButton();
+        createToast('success', '您已成功退出登录。');
+    }
+}
+
+
 // === MAIN INITIALIZATION ===
 class AIMorelogyApp {
     constructor() {
@@ -900,6 +1016,9 @@ class AIMorelogyApp {
             
             // Make scrollToSection globally available
             window.scrollToSection = this.scrollToSection;
+
+            // Initialize WeChat Login
+            this.components.wechatLogin = new WechatLoginIntegration('.nav-menu', '.nav-cta');
             
             console.log('🚀 AIMORELOGY App initialized successfully');
             
