@@ -153,6 +153,19 @@
                     });
 
                     if (!response.ok) {
+                        // 追加：尽量解析并打印错误体，帮助定位问题
+                        let errorBody = null;
+                        try {
+                            const ct = response.headers.get('content-type') || '';
+                            if (ct.includes('application/json')) {
+                                errorBody = await response.json();
+                            } else {
+                                errorBody = await response.text();
+                            }
+                        } catch (e) {
+                            errorBody = '(无法解析错误响应体)';
+                        }
+                        debugLog('Workers API错误体', errorBody);
                         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                     }
 
