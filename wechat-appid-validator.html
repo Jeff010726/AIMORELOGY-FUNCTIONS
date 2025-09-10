@@ -1,4 +1,173 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <me...([SYSTEM: More content content has been truncated for context window])
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微信AppID验证工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+        .button {
+            background: #1aad19;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-size: 16px;
+        }
+        .button:hover {
+            background: #179b16;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 微信AppID验证工具</h1>
+        <p>这个工具帮助验证微信AppID的有效性和权限配置</p>
+
+        <div class="test-section">
+            <h3>当前配置信息</h3>
+            <div id="configInfo" class="result info">
+AppID: wx2e1f9ccab9e27176
+授权域名: jeff010726.github.io/AIMORELOGY-FUNCTIONS
+回调地址: https://jeff010726.github.io/AIMORELOGY-FUNCTIONS/wechat-callback-debug.html
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>测试1: 基础授权 (snsapi_base)</h3>
+            <p>只获取用户openid，无需用户手动授权</p>
+            <button class="button" onclick="testBaseScope()">测试基础授权</button>
+            <div id="baseResult" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>测试2: 用户信息授权 (snsapi_userinfo)</h3>
+            <p>获取用户详细信息，需要用户手动授权</p>
+            <button class="button" onclick="testUserinfoScope()">测试用户信息授权</button>
+            <div id="userinfoResult" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>测试3: 简化授权链接</h3>
+            <p>使用最简单的参数组合</p>
+            <button class="button" onclick="testSimpleAuth()">测试简化授权</button>
+            <div id="simpleResult" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>诊断建议</h3>
+            <div class="result info">
+如果所有测试都显示"Oops! Something went wrong:("：
+1. 检查AppID是否正确
+2. 确认服务号已认证
+3. 验证授权域名配置
+4. 联系微信技术支持
+
+如果只有用户信息授权失败：
+1. 服务号可能没有高级权限
+2. 使用基础授权即可获取openid
+3. 通过openid调用其他API获取用户信息
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const APPID = 'wx2e1f9ccab9e27176';
+        const REDIRECT_URI = encodeURIComponent('https://jeff010726.github.io/AIMORELOGY-FUNCTIONS/wechat-callback-debug.html');
+
+        function generateState() {
+            return Math.random().toString(36).substring(2, 15) + 
+                   Math.random().toString(36).substring(2, 15) + 
+                   Date.now().toString(36);
+        }
+
+        function testBaseScope() {
+            const state = generateState();
+            const url = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${APPID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=snsapi_base&state=${state}#wechat_redirect`;
+            
+            const result = document.getElementById('baseResult');
+            result.style.display = 'block';
+            result.className = 'result info';
+            result.textContent = `生成授权链接：\n${url}\n\nState: ${state}\n\n点击下面的链接进行测试：`;
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.textContent = '打开微信基础授权';
+            link.target = '_blank';
+            link.style.display = 'block';
+            link.style.marginTop = '10px';
+            link.style.color = '#1aad19';
+            result.appendChild(link);
+        }
+
+        function testUserinfoScope() {
+            const state = generateState();
+            const url = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${APPID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=snsapi_userinfo&state=${state}#wechat_redirect`;
+            
+            const result = document.getElementById('userinfoResult');
+            result.style.display = 'block';
+            result.className = 'result info';
+            result.textContent = `生成授权链接：\n${url}\n\nState: ${state}\n\n点击下面的链接进行测试：`;
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.textContent = '打开微信用户信息授权';
+            link.target = '_blank';
+            link.style.display = 'block';
+            link.style.marginTop = '10px';
+            link.style.color = '#1aad19';
+            result.appendChild(link);
+        }
+
+        function testSimpleAuth() {
+            const state = generateState();
+            const url = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${APPID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=snsapi_base&state=${state}`;
+            
+            const result = document.getElementById('simpleResult');
+            result.style.display = 'block';
+            result.className = 'result info';
+            result.textContent = `生成简化授权链接（无#wechat_redirect）：\n${url}\n\nState: ${state}\n\n点击下面的链接进行测试：`;
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.textContent = '打开简化授权';
+            link.target = '_blank';
+            link.style.display = 'block';
+            link.style.marginTop = '10px';
+            link.style.color = '#1aad19';
+            result.appendChild(link);
+        }
+    </script>
+</body>
+</html>
