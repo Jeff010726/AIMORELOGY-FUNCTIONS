@@ -1,12 +1,13 @@
-// Cloudflare Workers 脚本 - 处理微信授权 (v3 - 密钥硬编码版)
+// Cloudflare Workers 脚本 - 处理微信授权 (v4 - CORS修复版)
 // 警告：密钥硬编码存在严重安全风险，仅供临时调试使用。
-// 强烈建议在生产环境中使用 Cloudflare 的环境变量来管理密钥。
+// 此版本修复了CORS预检请求处理，解决 "Failed to fetch" 问题。
 
 // --- 配置 (硬编码) ---
 const APP_CONFIG = {
     APPID: 'wx2e1f9ccab9e27176',
     APPSECRET: '2b0086643a47fe0de574efbfc27c0718',
-    ALLOWED_ORIGINS: 'https://jeff010726.github.io'
+    // 调试时临时改为通配符，解决CORS问题。成功后建议改回 'https://jeff010726.github.io'
+    ALLOWED_ORIGINS: '*'
 };
 
 // 微信API地址
@@ -20,68 +21,85 @@ const WECHAT_API = {
 // --- 主处理逻辑 ---
 export default {
     async fetch(request, env, ctx) {
+        // 预检请求优先处理
         if (request.method === 'OPTIONS') {
             return handleOptions(request);
         }
 
+        let response;
         const url = new URL(request.url);
-        if (url.pathname !== '/wechat/auth') {
-            return new Response(JSON.stringify({ success: false, message: 'Invalid path' }), { status: 404, headers: corsHeaders() });
+
+        if (url.pathname === '/wechat/auth' && request.method === 'POST') {
+            response = await handleAuthRequest(request, env);
+        } else {
+            response = new Response(JSON.stringify({ success: false, message: 'Not Found' }), { status: 404 });
         }
+        
+        // 为所有响应附加CORS头
+        const newHeaders = new Headers(response.headers);
+        const cors = corsHeaders(request);
+        Object.keys(cors).forEach(key => {
+            newHeaders.set(key, cors[key]);
+        });
 
-        if (request.method !== 'POST') {
-            return new Response(JSON.stringify({ success: false, message: 'Method not allowed' }), { status: 405, headers: corsHeaders() });
-        }
-
-        try {
-            const { code } = await request.json();
-            if (!code) {
-                return new Response(JSON.stringify({ success: false, message: 'Missing `code` parameter' }), { status: 400, headers: corsHeaders() });
-            }
-
-            const oauth2TokenData = await getOauth2AccessToken(code);
-            if (!oauth2TokenData.success) {
-                return new Response(JSON.stringify(oauth2TokenData), { status: 500, headers: corsHeaders() });
-            }
-            const { access_token: oauth2_token, openid, scope } = oauth2TokenData.data;
-
-            let userInfo = { openid, scope };
-            if (scope === 'snsapi_userinfo') {
-                const userInfoResult = await getUserInfo(oauth2_token, openid);
-                if (!userInfoResult.success) {
-                    return new Response(JSON.stringify(userInfoResult), { status: 500, headers: corsHeaders() });
-                }
-                userInfo = { ...userInfo, ...userInfoResult.data };
-            }
-
-            const subscriptionResult = await checkSubscription(openid, env); // `env` is needed here for cache
-            if (!subscriptionResult.success) {
-                return new Response(JSON.stringify(subscriptionResult), { status: 500, headers: corsHeaders() });
-            }
-            const { subscribe, subscribe_time } = subscriptionResult.data;
-            
-            const finalUserInfo = { ...userInfo, subscribe, subscribe_time };
-
-            if (subscribe !== 1) {
-                return new Response(JSON.stringify({
-                    success: false,
-                    needSubscribe: true,
-                    message: '请先关注我们的微信服务号后再登录',
-                    qrCodeUrl: 'qrcode_for_gh_ede2796af721_258.jpg'
-                }), { status: 200, headers: corsHeaders() });
-            }
-
-            return new Response(JSON.stringify({
-                success: true,
-                userInfo: finalUserInfo
-            }), { status: 200, headers: corsHeaders() });
-
-        } catch (error) {
-            console.error('Auth process error:', error);
-            return new Response(JSON.stringify({ success: false, message: `Server error: ${error.message}` }), { status: 500, headers: corsHeaders() });
-        }
+        return new Response(response.body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: newHeaders,
+        });
     },
 };
+
+// --- 业务逻辑处理器 ---
+async function handleAuthRequest(request, env) {
+    try {
+        const { code } = await request.json();
+        if (!code) {
+            return new Response(JSON.stringify({ success: false, message: 'Missing `code` parameter' }), { status: 400 });
+        }
+
+        const oauth2TokenData = await getOauth2AccessToken(code);
+        if (!oauth2TokenData.success) {
+            return new Response(JSON.stringify(oauth2TokenData), { status: 500 });
+        }
+        const { access_token: oauth2_token, openid, scope } = oauth2TokenData.data;
+
+        let userInfo = { openid, scope };
+        if (scope === 'snsapi_userinfo') {
+            const userInfoResult = await getUserInfo(oauth2_token, openid);
+            if (!userInfoResult.success) {
+                return new Response(JSON.stringify(userInfoResult), { status: 500 });
+            }
+            userInfo = { ...userInfo, ...userInfoResult.data };
+        }
+
+        const subscriptionResult = await checkSubscription(openid, env);
+        if (!subscriptionResult.success) {
+            return new Response(JSON.stringify(subscriptionResult), { status: 500 });
+        }
+        const { subscribe, subscribe_time } = subscriptionResult.data;
+        
+        const finalUserInfo = { ...userInfo, subscribe, subscribe_time };
+
+        if (subscribe !== 1) {
+            return new Response(JSON.stringify({
+                success: false,
+                needSubscribe: true,
+                message: '请先关注我们的微信服务号后再登录',
+                qrCodeUrl: 'qrcode_for_gh_ede2796af721_258.jpg'
+            }), { status: 200 });
+        }
+
+        return new Response(JSON.stringify({
+            success: true,
+            userInfo: finalUserInfo
+        }), { status: 200 });
+
+    } catch (error) {
+        console.error('Auth process error:', error);
+        return new Response(JSON.stringify({ success: false, message: `Server error: ${error.message}` }), { status: 500 });
+    }
+}
 
 // --- 辅助函数 ---
 
@@ -156,12 +174,12 @@ async function getGlobalAccessToken(env) {
     return { success: true, data: cacheData };
 }
 
-// --- CORS 处理 ---
-function corsHeaders() {
+// --- CORS 处理 (v4 修复版) ---
+function corsHeaders(request) {
     return {
         'Access-Control-Allow-Origin': APP_CONFIG.ALLOWED_ORIGINS,
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+        'Access-Control-Allow-Headers': request.headers.get('Access-Control-Request-Headers') || 'Content-Type',
     };
 }
 
@@ -171,8 +189,15 @@ function handleOptions(request) {
         request.headers.get('Access-Control-Request-Method') !== null &&
         request.headers.get('Access-Control-Request-Headers') !== null
     ) {
-        return new Response(null, { headers: corsHeaders() });
+        return new Response(null, {
+            status: 204,
+            headers: corsHeaders(request),
+        });
     } else {
-        return new Response(null, { headers: { Allow: 'POST, OPTIONS' } });
+        return new Response(null, {
+            headers: {
+                Allow: 'POST, GET, OPTIONS',
+            },
+        });
     }
 }
