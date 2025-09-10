@@ -79,7 +79,7 @@ function checkWechatAuthCallback() {
     const state = urlParams.get('state');
     
     if (code && state) {
-        const savedState = localStorage.getItem('wechat_state');
+        const savedState = localStorage.getItem('wechat_auth_state');
         if (state === savedState) {
             // 处理授权成功
             handleWechatAuthCode(code);
@@ -694,7 +694,7 @@ function checkWechatAuthResult() {
     
     // 生成微信授权登录二维码
     const state = generateRandomState();
-    localStorage.setItem('wechat_login_state', state);
+    localStorage.setItem('wechat_auth_state', state);
     
     // 构建微信授权URL
     const redirectUri = encodeURIComponent(window.location.origin + '/wechat-callback.html');
@@ -814,7 +814,7 @@ async function checkWechatLoginStatus() {
     const state = generateRandomState();
     
     // 保存state到localStorage用于验证
-    localStorage.setItem('wechat_state', state);
+    localStorage.setItem('wechat_auth_state', state);
     
     const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${WECHAT_APPID}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_userinfo&state=${state}#wechat_redirect`;
     
@@ -826,7 +826,7 @@ async function checkWechatLoginStatus() {
         const code = urlParams.get('code');
         const state = urlParams.get('state');
         
-        if (code && state === localStorage.getItem('wechat_state')) {
+        if (code && state === localStorage.getItem('wechat_auth_state')) {
             // 有授权码，获取用户信息
             getWechatUserInfo(code).then(userInfo => {
                 resolve({
