@@ -79,25 +79,19 @@ async function handleWechatValidation(request, env) {
     }
 }
 
-// 【修正版】事件入口：同步处理，立即返回XML回复（遵循成功案例）
+// 【修正版】事件入口：按照微信文档要求，简单返回success
 async function handleWechatEvent(request, env, ctx) {
     const xmlText = await request.text();
     const eventData = parseXml(xmlText);
 
-    // 扫码登录事件：同步处理并返回XML回复
+    // 扫码登录事件：同步处理，但只返回success（按微信文档要求）
     if (eventData.MsgType === 'event' && (eventData.Event === 'SCAN' || eventData.Event === 'subscribe')) {
-        const result = await handleScanLoginSync(eventData, env);
-        if (result.success) {
-            const responseXml = createReplyXml(eventData.FromUserName, eventData.ToUserName, result.message);
-            return new Response(responseXml, { headers: { 'Content-Type': 'application/xml' } });
-        } else {
-            // 如果处理失败，返回错误消息
-            const responseXml = createReplyXml(eventData.FromUserName, eventData.ToUserName, '登录处理失败，请重试');
-            return new Response(responseXml, { headers: { 'Content-Type': 'application/xml' } });
-        }
+        // 异步处理登录逻辑，但立即返回success
+        ctx.waitUntil(handleScanLoginSync(eventData, env));
+        return new Response('success');
     }
     
-    // 其他事件：返回通用回复
+    // 文本消息：返回XML回复
     if (eventData.MsgType === 'text') {
         const responseXml = createReplyXml(eventData.FromUserName, eventData.ToUserName, '您好，此账号主要用于扫码登录，如需帮助请联系客服。');
         return new Response(responseXml, { headers: { 'Content-Type': 'application/xml' } });
