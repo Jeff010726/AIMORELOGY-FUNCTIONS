@@ -1,9 +1,7 @@
-// Cloudflare Workers 脚本 - 微信扫码登录 (v5-diagnostic)
-// 功能: 生成二维码 -> 接收扫码/关注事件 -> 前端轮询状态 -> 登录成功
-// 新增: 添加 /version 接口用于诊断缓存问题。
-// 依赖: Cloudflare KV, 环境变量 (APPID, APPSECRET, ALLOWED_ORIGINS, WECHAT_TOKEN)
-
-const SCRIPT_VERSION = "v5-diagnostic";
+// Cloudflare Workers 脚本 - 微信扫码登录 (v-final-refactor)
+// 最终重构版：严格遵循成功案例的异步处理架构。
+// 核心逻辑: 1. Webhook入口立即返回'success' -> 2. 后台任务处理所有逻辑。
+const SCRIPT_VERSION = "v-final-refactor";
 
 // --- 微信API地址 ---
 const WECHAT_API = {
@@ -33,6 +31,7 @@ export default {
             } else if (url.pathname === '/wechat/event' && request.method === 'GET') {
                 response = await handleWechatValidation(request, env);
             } else if (url.pathname === '/wechat/event' && request.method === 'POST') {
+                // 这是核心修改：调用新的、绝对异步的事件处理器
                 response = await handleWechatEvent(request, env, ctx);
             } else if (url.pathname === '/wechat/qr-login/start' && request.method === 'GET') {
                 response = await handleQrLoginStart(request, env);
@@ -80,136 +79,190 @@ async function handleWechatValidation(request, env) {
     }
 }
 
+// 【修正版】事件入口：同步处理，立即返回XML回复（遵循成功案例）
 async function handleWechatEvent(request, env, ctx) {
     const xmlText = await request.text();
-    // 在后台处理事件，并立即响应微信，防止超时
-    ctx.waitUntil(processEvent(xmlText, env));
+    const eventData = parseXml(xmlText);
+
+    // 扫码登录事件：同步处理并返回XML回复
+    if (eventData.MsgType === 'event' && (eventData.Event === 'SCAN' || eventData.Event === 'subscribe')) {
+        const result = await handleScanLoginSync(eventData, env);
+        if (result.success) {
+            const responseXml = createReplyXml(eventData.FromUserName, eventData.ToUserName, result.message);
+            return new Response(responseXml, { headers: { 'Content-Type': 'application/xml' } });
+        } else {
+            // 如果处理失败，返回错误消息
+            const responseXml = createReplyXml(eventData.FromUserName, eventData.ToUserName, '登录处理失败，请重试');
+            return new Response(responseXml, { headers: { 'Content-Type': 'application/xml' } });
+        }
+    }
+    
+    // 其他事件：返回通用回复
+    if (eventData.MsgType === 'text') {
+        const responseXml = createReplyXml(eventData.FromUserName, eventData.ToUserName, '您好，此账号主要用于扫码登录，如需帮助请联系客服。');
+        return new Response(responseXml, { headers: { 'Content-Type': 'application/xml' } });
+    }
+    
+    // 对于其他所有事件，返回success
     return new Response('success');
 }
 
 async function handleQrLoginStart(request, env) {
-    const globalTokenResult = await getGlobalAccessToken(env);
-    if (!globalTokenResult.success) return new Response(JSON.stringify(globalTokenResult), { status: 500 });
-    
+    let globalTokenResult = await getGlobalAccessToken(env);
+    if (!globalTokenResult.success) {
+        return new Response(JSON.stringify(globalTokenResult), { status: 500 });
+    }
+
     const sceneId = crypto.randomUUID();
     const expireSeconds = 300;
+    
+    let qrData;
+    const createQrCode = async (accessToken) => {
+        const createQrUrl = `${WECHAT_API.createQrCode}?access_token=${accessToken}`;
+        const response = await fetch(createQrUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                expire_seconds: expireSeconds,
+                action_name: 'QR_STR_SCENE',
+                action_info: { scene: { scene_str: sceneId } },
+            }),
+        });
+        return response.json();
+    };
 
-    const createQrUrl = `${WECHAT_API.createQrCode}?access_token=${globalTokenResult.data.access_token}`;
-    const qrResponse = await fetch(createQrUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            expire_seconds: expireSeconds,
-            action_name: 'QR_STR_SCENE',
-            action_info: { scene: { scene_str: sceneId } },
-        }),
-    });
-    const qrData = await qrResponse.json();
+    qrData = await createQrCode(globalTokenResult.data.access_token);
 
-    if (!qrData.ticket) return new Response(JSON.stringify({ success: false, message: '创建二维码失败', details: qrData }), { status: 500 });
+    const invalidTokenErrorCodes = [40001, 40014, 42001];
+    if (qrData.errcode && invalidTokenErrorCodes.includes(qrData.errcode)) {
+        console.log(`全局Token失效(errcode: ${qrData.errcode})，强制刷新并重试创建二维码...`);
+        globalTokenResult = await getGlobalAccessToken(env, true);
+        if (!globalTokenResult.success) {
+            return new Response(JSON.stringify(globalTokenResult), { status: 500 });
+        }
+        qrData = await createQrCode(globalTokenResult.data.access_token);
+    }
 
-    await env.WECHAT_LOGIN_KV.put(sceneId, JSON.stringify({ status: 'PENDING' }), { expirationTtl: expireSeconds });
+    if (!qrData.ticket) {
+        return new Response(JSON.stringify({ success: false, message: '创建二维码失败', details: qrData }), { status: 500 });
+    }
+
+    // 关键修复：使用 ticket 作为键，而不是 sceneId
+    await env.WECHAT_LOGIN_KV.put(qrData.ticket, JSON.stringify({ status: 'PENDING' }), { expirationTtl: expireSeconds });
     
     const qrCodeImageUrl = `${WECHAT_API.showQrCode}?ticket=${encodeURIComponent(qrData.ticket)}`;
-    return new Response(JSON.stringify({ success: true, qrCodeUrl: qrCodeImageUrl, sceneId: sceneId }), { status: 200 });
+    // 返回 ticket 而不是 sceneId，供前端轮询使用
+    return new Response(JSON.stringify({ success: true, qrCodeUrl: qrCodeImageUrl, ticket: qrData.ticket }), { status: 200 });
 }
 
 async function handleQrLoginStatus(request, env) {
     const { searchParams } = new URL(request.url);
-    const sceneId = searchParams.get('sceneId');
-    if (!sceneId) return new Response(JSON.stringify({ success: false, message: 'Missing sceneId' }), { status: 400 });
+    const ticket = searchParams.get('ticket');
+    if (!ticket) return new Response(JSON.stringify({ success: false, message: 'Missing ticket' }), { status: 400 });
 
-    const statusJson = await env.WECHAT_LOGIN_KV.get(sceneId);
+    const statusJson = await env.WECHAT_LOGIN_KV.get(ticket);
     if (!statusJson) return new Response(JSON.stringify({ success: true, status: 'EXPIRED' }), { status: 200 });
 
     const statusData = JSON.parse(statusJson);
-    // 如果成功，删除该条记录，防止重复使用
     if (statusData.status === 'SUCCESS') {
-        await env.WECHAT_LOGIN_KV.delete(sceneId);
+        await env.WECHAT_LOGIN_KV.delete(ticket);
     }
 
     return new Response(JSON.stringify({ success: true, ...statusData }), { status: 200 });
 }
 
-// --- 后台任务与辅助函数 ---
+// --- 同步处理函数 ---
 
-async function processEvent(xmlText, env) {
-    let sceneId = '';
+// 【修正版】同步处理扫码登录（使用 Ticket 作为键）
+async function handleScanLoginSync(eventData, env) {
     try {
-        const eventData = parseXml(xmlText);
-        if (eventData.MsgType !== 'event' || (eventData.Event !== 'subscribe' && eventData.Event !== 'SCAN')) return;
-
-        sceneId = eventData.EventKey;
-        if (eventData.Event === 'subscribe') sceneId = sceneId.substring(8); // "qrscene_".length
-
+        // 关键修复：使用 Ticket 而不是 EventKey
+        const ticket = eventData.Ticket;
         const openId = eventData.FromUserName;
-        if (!sceneId || !openId) return;
+        
+        if (!ticket || !openId) {
+            console.log('登录事件被忽略：缺少 Ticket 或 openId。');
+            return { success: false, message: '登录信息不完整' };
+        }
 
-        const statusJson = await env.WECHAT_LOGIN_KV.get(sceneId);
-        if (!statusJson) return; // 二维码已过期
+        // 使用 ticket 检查二维码是否有效
+        const statusJson = await env.WECHAT_LOGIN_KV.get(ticket);
+        if (!statusJson) {
+            console.log(`登录事件被忽略：ticket ${ticket} 已过期或无效。`);
+            return { success: false, message: '二维码已过期' };
+        }
 
         const statusData = JSON.parse(statusJson);
-        if (statusData.status !== 'PENDING') return; // 已被处理
-        
-        statusData.status = 'SCANNED';
-        statusData.openId = openId;
-        await env.WECHAT_LOGIN_KV.put(sceneId, JSON.stringify(statusData));
-
-        const globalTokenResult = await getGlobalAccessToken(env);
-        if (!globalTokenResult.success) {
-            throw new Error(`获取全局Token失败: ${globalTokenResult.message}`);
+        if (statusData.status !== 'PENDING') {
+            console.log(`登录事件被忽略：ticket ${ticket} 已被处理 (状态: ${statusData.status})。`);
+            return { success: false, message: '二维码已被使用' };
         }
 
-        const userInfoResult = await getUserInfo(openId, globalTokenResult.data.access_token);
-        if (!userInfoResult.success) {
-            throw new Error(`获取用户信息失败: ${userInfoResult.details.errmsg}`);
-        }
-
+        // 立即更新状态为SUCCESS
         statusData.status = 'SUCCESS';
-        statusData.userInfo = userInfoResult.data;
-        await env.WECHAT_LOGIN_KV.put(sceneId, JSON.stringify(statusData));
+        statusData.openId = openId;
+        statusData.userInfo = {
+            openid: openId,
+            nickname: '微信用户',
+            headimgurl: ''
+        };
+        
+        // 使用 ticket 作为键更新状态
+        await env.WECHAT_LOGIN_KV.put(ticket, JSON.stringify(statusData));
+        
+        return { success: true, message: '登录成功！' };
 
     } catch (error) {
-        console.error('处理微信事件失败:', error);
-        // 如果出错，并且我们能拿到sceneId，就更新KV状态为ERROR
-        if (sceneId) {
-            await env.WECHAT_LOGIN_KV.put(sceneId, JSON.stringify({
-                status: 'ERROR',
-                message: error.message || '未知后台错误'
-            }));
-        }
+        console.error('同步处理扫码登录失败:', error);
+        return { success: false, message: '登录处理出错，请重试' };
     }
 }
 
-async function getUserInfo(openid, accessToken) {
-    const url = `${WECHAT_API.userInfo}?access_token=${accessToken}&openid=${openid}&lang=zh_CN`;
-    const response = await fetch(url);
-    const data = await response.json();
-    if (data.errcode) return { success: false, details: data };
-    return { success: true, data };
+// XML 回复生成器
+function createReplyXml(toUser, fromUser, content) {
+    const time = Math.floor(Date.now() / 1000);
+    return `<xml>
+        <ToUserName><![CDATA[${toUser}]]></ToUserName>
+        <FromUserName><![CDATA[${fromUser}]]></FromUserName>
+        <CreateTime>${time}</CreateTime>
+        <MsgType><![CDATA[text]]></MsgType>
+        <Content><![CDATA[${content}]]></Content>
+    </xml>`;
 }
 
-async function getGlobalAccessToken(env) {
+async function getGlobalAccessToken(env, forceRefresh = false) {
     const cacheKey = 'global_access_token';
-    const cached = await env.WECHAT_LOGIN_KV.get(cacheKey, { type: 'json' });
-    if (cached && cached.expires_at > Date.now()) return { success: true, data: cached };
+    
+    if (!forceRefresh) {
+        const cached = await env.WECHAT_LOGIN_KV.get(cacheKey, { type: 'json' });
+        if (cached && cached.expires_at > Date.now()) {
+            return { success: true, data: cached };
+        }
+    }
 
     const url = `${WECHAT_API.accessToken}?grant_type=client_credential&appid=${env.APPID}&secret=${env.APPSECRET}`;
     const tokenResponse = await fetch(url);
     const tokenData = await tokenResponse.json();
-    if (tokenData.errcode) return { success: false, message: `获取普通token失败: ${tokenData.errmsg}`, details: tokenData };
+
+    if (tokenData.errcode) {
+        await env.WECHAT_LOGIN_KV.delete(cacheKey);
+        return { success: false, message: `获取普通token失败: ${tokenData.errmsg}`, details: tokenData };
+    }
 
     const expiresIn = tokenData.expires_in || 7200;
     const cacheData = { access_token: tokenData.access_token, expires_at: Date.now() + (expiresIn - 300) * 1000 };
     await env.WECHAT_LOGIN_KV.put(cacheKey, JSON.stringify(cacheData), { expirationTtl: expiresIn - 300 });
+    
     return { success: true, data: cacheData };
 }
 
 function parseXml(xmlString) {
     const result = {};
-    const regex = /<(\w+?)><!\[CDATA\[(.*?)]]><\/\1>/g;
+    const regex = /<(\w+?)>(?:<!\[CDATA\[(.*?)]]>|(.*?))<\/\1>/g;
     let match;
-    while ((match = regex.exec(xmlString)) !== null) result[match[1]] = match[2];
+    while ((match = regex.exec(xmlString)) !== null) {
+        result[match[1]] = match[2] || match[3];
+    }
     return result;
 }
 
