@@ -230,7 +230,92 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- Live Log Viewer ---
+    let logPollingInterval = null;
+
+    function setupLogViewer() {
+        // 1. Inject CSS
+        const logStyles = `
+            #log-toggle-btn { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; border-radius: 50%; background-color: #6c757d; color: white; border: none; font-size: 24px; cursor: pointer; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+            #log-viewer-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); z-index: 1001; display: flex; justify-content: center; align-items: center; }
+            #log-viewer-container.hidden { display: none; }
+            #log-viewer-content-wrapper { background-color: #282c34; color: #abb2bf; width: 80vw; max-width: 1200px; height: 80vh; padding: 20px; border-radius: 8px; display: flex; flex-direction: column; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+            #log-viewer-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 10px; }
+            #log-viewer-header h3 { margin: 0; color: white; }
+            #log-viewer-close { background: none; border: none; color: white; font-size: 28px; cursor: pointer; line-height: 1; }
+            #log-content { flex-grow: 1; overflow-y: auto; white-space: pre-wrap; word-break: break-all; font-family: 'Courier New', Courier, monospace; font-size: 14px; }
+        `;
+        const styleSheet = document.createElement("style");
+        styleSheet.type = "text/css";
+        styleSheet.innerText = logStyles;
+        document.head.appendChild(styleSheet);
+
+        // 2. Inject HTML
+        const logContainer = document.createElement('div');
+        logContainer.id = 'log-viewer-container';
+        logContainer.className = 'hidden';
+        logContainer.innerHTML = `
+            <div id="log-viewer-content-wrapper">
+                <div id="log-viewer-header">
+                    <h3>Backend Logs</h3>
+                    <button id="log-viewer-close">&times;</button>
+                </div>
+                <pre id="log-content">Fetching logs...</pre>
+            </div>
+        `;
+        document.body.appendChild(logContainer);
+
+        const logToggleBtn = document.createElement('button');
+        logToggleBtn.id = 'log-toggle-btn';
+        logToggleBtn.innerHTML = '📜';
+        document.body.appendChild(logToggleBtn);
+
+        // 3. Add Event Listeners
+        const logContentEl = document.getElementById('log-content');
+
+        logToggleBtn.addEventListener('click', () => {
+            logContainer.classList.remove('hidden');
+            startLogPolling(logContentEl);
+        });
+
+        document.getElementById('log-viewer-close').addEventListener('click', () => {
+            logContainer.classList.add('hidden');
+            stopLogPolling();
+        });
+    }
+
+    async function fetchLogs(logContentEl) {
+        try {
+            const response = await fetch(`${WORKER_URL}/logs`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && Array.isArray(data.logs)) {
+                    logContentEl.textContent = data.logs.join('\
+');
+                } else {
+                    logContentEl.textContent = 'Failed to parse logs from response.';
+                }
+            } else {
+                logContentEl.textContent = `Error fetching logs: HTTP ${response.status}`;
+            }
+        } catch (e) {
+            logContentEl.textContent = `Error fetching logs: ${e.message}`;
+        }
+    }
+
+    function startLogPolling(logContentEl) {
+        if (logPollingInterval) clearInterval(logPollingInterval);
+        fetchLogs(logContentEl); // Fetch immediately
+        logPollingInterval = setInterval(() => fetchLogs(logContentEl), 3000); // Poll every 3 seconds
+    }
+
+    function stopLogPolling() {
+        if (logPollingInterval) clearInterval(logPollingInterval);
+        logPollingInterval = null;
+    }
+
     // --- Initial Load ---
     checkLoginStatus();
     displayVersion();
+    setupLogViewer();
 });
