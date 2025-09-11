@@ -96,6 +96,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function startPolling(sceneId) {
         if (pollingInterval) clearInterval(pollingInterval);
 
+        // --- DIAGNOSTIC LOG ---
+        console.log(`[Polling Setup] startPolling called with sceneId: '${sceneId}' (Type: ${typeof sceneId})`);
+        if (!sceneId) {
+            console.error("[Polling Setup] CRITICAL: sceneId is empty or undefined. Polling will not start.");
+            loginStatusEl.innerHTML = `<p style="color: red;">前端错误：无法获取场景ID，请刷新重试。</p>`;
+            return;
+        }
+        // --- END DIAGNOSTIC LOG ---
+
         const startTime = Date.now();
         const timeout = 300 * 1000; // 5 minutes
 
@@ -106,12 +115,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const statusUrl = `${WORKER_URL}/wechat/qr-login/status?sceneId=${sceneId}`;
+            
+            // --- DIAGNOSTIC LOG ---
+            console.log(`[Polling] Checking URL: ${statusUrl}`);
+            // --- END DIAGNOSTIC LOG ---
+
             try {
-                const response = await fetch(`${WORKER_URL}/wechat/qr-login/status?sceneId=${sceneId}`);
-                if (!response.ok) return;
+                const response = await fetch(statusUrl);
+                if (!response.ok) {
+                    console.error(`[Polling] Error: Fetch failed with status ${response.status} for URL: ${statusUrl}`);
+                    // Stop polling on critical errors like 404
+                    if(response.status === 404) {
+                        clearInterval(pollingInterval);
+                        loginStatusEl.innerHTML = `<p style="color: red;">前端错误：请求地址不存在，请联系管理员。</p>`;
+                    }
+                    return;
+                }
 
                 const data = await response.json();
-                if (!data.success) return;
+                if (!data.success) {
+                    console.warn(`[Polling] API returned success:false. Message: ${data.message}`);
+                    return;
+                }
 
                 switch (data.status) {
                     case 'SUCCESS':
@@ -149,7 +175,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
                 }
             } catch (error) {
-                // Silently ignore network errors and retry
+                console.error('[Polling] CRITICAL: An unexpected error occurred during fetch:', error);
+                clearInterval(pollingInterval); // Stop polling on unexpected errors
             }
         }, 2500); // Poll every 2.5 seconds
     }
