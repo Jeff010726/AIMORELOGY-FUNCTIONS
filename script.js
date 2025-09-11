@@ -258,7 +258,10 @@ document.addEventListener('DOMContentLoaded', () => {
             <div id="log-viewer-content-wrapper">
                 <div id="log-viewer-header">
                     <h3>Backend Logs</h3>
-                    <button id="log-viewer-close">&times;</button>
+                    <div>
+                        <button id="clear-logs-btn" style="background-color: #dc3545; color: white; border: none; padding: 5px 10px; margin-right: 10px; border-radius: 4px; cursor: pointer;">🗑️ Clear</button>
+                        <button id="log-viewer-close">&times;</button>
+                    </div>
                 </div>
                 <pre id="log-content">Fetching logs...</pre>
             </div>
@@ -281,6 +284,21 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('log-viewer-close').addEventListener('click', () => {
             logContainer.classList.add('hidden');
             stopLogPolling();
+        });
+
+        document.getElementById('clear-logs-btn').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${WORKER_URL}/clear-logs`, { method: 'POST' });
+                if (response.ok) {
+                    logContentEl.textContent = 'Logs cleared successfully.';
+                    // Refresh logs after a short delay
+                    setTimeout(() => fetchLogs(logContentEl), 1000);
+                } else {
+                    logContentEl.textContent = `Error clearing logs: HTTP ${response.status}`;
+                }
+            } catch (e) {
+                logContentEl.textContent = `Error clearing logs: ${e.message}`;
+            }
         });
     }
 
