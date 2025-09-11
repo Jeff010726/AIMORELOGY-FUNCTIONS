@@ -77,9 +77,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${WORKER_URL}/wechat/qr-login/start`);
             const data = await response.json();
 
+            // --- DIAGNOSTIC LOG ---
+            console.log('Data received from /wechat/qr-login/start:', JSON.stringify(data, null, 2));
+            // --- END DIAGNOSTIC LOG ---
+
             if (response.ok && data.success) {
                 qrCodeContainer.innerHTML = `<img src="${data.qrCodeUrl}" alt="微信登录二维码" style="width: 100%; height: 100%;">`;
-                startPolling(data.ticket); 
+                startPolling(data.sceneId); 
             } else {
                 qrCodeContainer.innerHTML = `<p style="color: red;">二维码生成失败: ${data.message || '未知错误'}</p>`;
             }
@@ -89,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function startPolling(ticket) {
+    function startPolling(sceneId) {
         if (pollingInterval) clearInterval(pollingInterval);
 
         const startTime = Date.now();
@@ -103,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const response = await fetch(`${WORKER_URL}/wechat/qr-login/status/${ticket}`);
+                const response = await fetch(`${WORKER_URL}/wechat/qr-login/status?sceneId=${sceneId}`);
                 if (!response.ok) return;
 
                 const data = await response.json();
